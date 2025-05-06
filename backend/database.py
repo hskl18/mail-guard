@@ -1,305 +1,255 @@
 import os
-import time
-import logging
 import mysql.connector
+from mysql.connector import pooling
+from datetime import datetime, timedelta
+from typing import Dict, Any, List
+from fastapi import HTTPException
 
-from typing import Optional
-from dotenv import load_dotenv
-from mysql.connector import Error
-
-# Load environment variables
-load_dotenv()
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-class DatabaseConnectionError(Exception):
-    """Custom exception for database connection failures"""
-
-    pass
-
-
-def get_db_connection(
-    max_retries: int = 12,  # 12 retries = 1 minute total (12 * 5 seconds)
-    retry_delay: int = 5,  # 5 seconds between retries
-) -> mysql.connector.MySQLConnection:
-    """Create database connection with retry mechanism."""
-    connection: Optional[mysql.connector.MySQLConnection] = None
-    attempt = 1
-    last_error = None
-
-    while attempt <= max_retries:
-        try:
-            connection = mysql.connector.connect(
-                host=os.getenv("MYSQL_HOST"),
-                user=os.getenv("MYSQL_USER"),
-                port=int(os.getenv('MYSQL_PORT')),
-                password=os.getenv("MYSQL_PASSWORD"),
-                database=os.getenv("MYSQL_DATABASE"),
-                ssl_ca=os.getenv('MYSQL_SSL_CA'),  # Path to CA certificate file
-                ssl_verify_identity=True
-            )
-
-            # Test the connection
-            connection.ping(reconnect=True, attempts=1, delay=0)
-            logger.info("Database connection established successfully")
-            return connection
-
-        except Error as err:
-            last_error = err
-            logger.warning(
-                f"Connection attempt {attempt}/{max_retries} failed: {err}. "
-                f"Retrying in {retry_delay} seconds..."
-            )
-
-            if connection is not None:
-                try:
-                    connection.close()
-                except Exception:
-                    pass
-
-            if attempt == max_retries:
-                break
-
-            time.sleep(retry_delay)
-            attempt += 1
-
-    raise DatabaseConnectionError(
-        f"Failed to connect to database after {max_retries} attempts. "
-        f"Last error: {last_error}"
-    )
-
-
-async def setup_database(initial_users: dict = None):
-    """Creates user and session tables and populates initial user data if provided."""
-    connection = None
-    cursor = None
-
-    # Define table schemas
-    table_schemas = {
-        "notifications": """
-            CREATE TABLE notifications (
-                id VARCHAR(36) PRIMARY KEY,
-                user_id INT NOT NULL,
-                status VARCHAR(50),
-                battery INT,
-                image_url VARCHAR(100),
-                curr_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
-        """,
-        "devices": """
-            CREATE TABLE devices (
-                id VARCHAR(36) PRIMARY KEY,
-                user_id INT NOT NULL,
-                topic VARCHAR(50),
-                status VARCHAR(50),
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
-        """,
-        "sensorData": """
-            CREATE TABLE sensorData (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT,
-                device_id VARCHAR(36),
-                sensor_type VARCHAR(100),
-                value FLOAT,
-                weight FLOAT,
-                unit VARCHAR(50),
-                image_url VARCHAR(100),
-                curr_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-                )
-        """,
-    }
-
+# 1) Initialize the MySQL database if it doesn’t exist
+def initialize_database():
     try:
-        # Get database connection
-        connection = get_db_connection()
-        cursor = connection.cursor()
-
-        # Drop and recreate tables one by one
-        for table_name in ["sensorData", "devices", "notifications"]:
-            # Drop table if exists
-            logger.info(f"Dropping table {table_name} if exists...")
-            cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
-            connection.commit()
-
-        # Recreate tables one by one
-        for table_name, create_query in table_schemas.items():
-
-            try:
-                # Create table
-                logger.info(f"Creating table {table_name}...")
-                cursor.execute(create_query)
-                connection.commit()
-                logger.info(f"Table {table_name} created successfully")
-
-            except Error as e:
-                logger.error(f"Error creating table {table_name}: {e}")
-                raise
-
-    except Exception as e:
-        logger.error(f"Database setup failed: {e}")
-        raise
-
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-            logger.info("Database connection closed")
-
-
-####### DEVICES ############
-
-async def get_user_devices(user_id: int):
-    """Fetch all devices for a specific user from the database."""
-    connection = None
-    cursor = None
-
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM devices WHERE user_id = %s", (user_id,))
-        return cursor.fetchall()
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-async def get_device(id: str, user_id: int):
-    connection = None
-    cursor = None
-
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM devices WHERE id = %s AND user_id = %s", (id, user_id,))
-        return cursor.fetchone()
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-async def add_user_device(id: str, user_id: int, topic: str, status: str):
-    """Insert a new device into the database."""
-    connection = None
-    cursor = None
-
-    unique_id = id + str(user_id)
-
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        cursor.execute(
-            "INSERT INTO devices (id, user_id, topic, status) VALUES (%s, %s, %s, %s)",
-            (unique_id, user_id, topic, status)
+        conn = mysql.connector.connect(
+            host=os.getenv("MYSQL_HOST"),
+            port=int(os.getenv("MYSQL_PORT", 3306)),
+            user=os.getenv("MYSQL_USER"),
+            password=os.getenv("MYSQL_PASSWORD"),
+            database=""  # connect to server only
         )
-        connection.commit()
-        return True
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-async def delete_user_device(id: str, user_id: int):
-    connection = None
-    cursor = None
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        cursor.execute("DELETE FROM devices WHERE id = %s AND user_id = %s", (id, user_id,))
-        connection.commit()
-        return True
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-async def get_devices():
-    connection = None
-    cursor = None
-
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-
-        cursor.execute("SELECT * FROM devices")
-        return cursor.fetchall()
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-
-#### SENSOR DATA ######
-async def get_all_data():
-    connection = None
-    cursor = None
-
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-
-        cursor.execute("SELECT * FROM sensorData")
-        sensorData = cursor.fetchall()
-
-        return sensorData
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-
-async def get_user_sensor_data(user_id: int):
-    connection = None
-    cursor = None
-
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-
-        cursor.execute("SELECT * FROM sensorData WHERE user_id = %s", (user_id,))
-        return cursor.fetchall()
-    finally:
+        cursor = conn.cursor()
+        db_name = os.getenv("MYSQL_DATABASE", "mailboxdb")
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
         cursor.close()
-        connection.close()
+        conn.close()
+    except mysql.connector.Error as err:
+        print(f"Error creating database: {err}")
 
-def add_user_sensor_data(value: float):
-    connection = None
-    cursor = None
+initialize_database()
 
+# 2) Create a connection pool
+dbconfig = {
+    "host":     os.getenv("MYSQL_HOST"),
+    "port":     int(os.getenv("MYSQL_PORT", 3306)),
+    "user":     os.getenv("MYSQL_USER"),
+    "password": os.getenv("MYSQL_PASSWORD"),
+    "database": os.getenv("MYSQL_DATABASE", "mailboxdb"),
+}
+connection_pool = pooling.MySQLConnectionPool(
+    pool_name="mailbox_pool",
+    pool_size=10,
+    **dbconfig
+)
+
+def get_mysql_connection():
     try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        
-        cursor.execute("INSERT INTO sensorData (value) VALUES (%s)", (value,))
-        connection.commit()
-    finally:
-        cursor.close()
-        connection.close()
+        return connection_pool.get_connection()
+    except mysql.connector.Error as err:
+        print(f"Error connecting to MySQL: {err}")
+        return None
 
-async def get_topic_by_user(user_id: int):
-    connection = None
-    cursor = None
+# 3) Seed all necessary tables
+def seed_db():
+    conn = get_mysql_connection()
+    if conn is None:
+        raise RuntimeError("Unable to get DB connection for seeding")
+    cursor = conn.cursor()
+    # Users
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        full_name    VARCHAR(255),
+        email        VARCHAR(255) UNIQUE,
+        username     VARCHAR(50) UNIQUE,
+        password     VARCHAR(255),
+        region       VARCHAR(100),
+        created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+    """)
+    # Sessions
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sessions (
+        session_id  VARCHAR(255) PRIMARY KEY,
+        user_id     INT NOT NULL,
+        created_at  DATETIME,
+        expires_at  DATETIME,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB;
+    """)
+    # Devices
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS devices (
+        id                INT AUTO_INCREMENT PRIMARY KEY,
+        user_id           INT NOT NULL,
+        device_name       VARCHAR(255),
+        device_id         VARCHAR(255) UNIQUE,
+        location          VARCHAR(255),
+        firmware_version  VARCHAR(50),
+        is_active         BOOLEAN DEFAULT TRUE,
+        last_seen         DATETIME,
+        created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB;
+    """)
+    # Mailbox open/close events
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS mailbox_events (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        user_id     INT NOT NULL,
+        device_id   VARCHAR(255),
+        event_type  ENUM('open','close') NOT NULL,
+        timestamp   DATETIME NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB;
+    """)
+    # Mail weight readings
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS mail_weight (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        user_id     INT NOT NULL,
+        device_id   VARCHAR(255),
+        weight      DOUBLE NOT NULL,
+        unit        VARCHAR(20),
+        timestamp   DATETIME NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB;
+    """)
+    # Camera snapshots (store S3 URLs)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS images (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        user_id     INT NOT NULL,
+        device_id   VARCHAR(255),
+        image_url   VARCHAR(2083),
+        timestamp   DATETIME NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB;
+    """)
+    # Notifications log
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS notifications (
+        id                 INT AUTO_INCREMENT PRIMARY KEY,
+        user_id            INT NOT NULL,
+        device_id          VARCHAR(255),
+        notification_type  VARCHAR(50),
+        sent_at            DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    ) ENGINE=InnoDB;
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
+seed_db()
 
-        cursor.execute("SELECT id FROM devices WHERE user_id = %s", (user_id,))
-        return cursor.fetchall()
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
+# 4) Helper to resolve Clerk email → internal user_id
+def get_user_id_by_email(email: str) -> int:
+    conn = get_mysql_connection()
+    if conn is None:
+        raise HTTPException(status_code=500, detail="DB connection unavailable")
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"No user for email `{email}`")
+    return row["id"]
+
+# 5) CRUD for mailbox events
+def add_mailbox_event_db(email: str, device_id: str, event_type: str, ts: datetime) -> Dict[str,int]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO mailbox_events (user_id, device_id, event_type, timestamp) VALUES (%s,%s,%s,%s)",
+        (user_id, device_id, event_type, ts)
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    cursor.close(); conn.close()
+    return {"id": new_id}
+
+def get_mailbox_events_db(email: str, device_id: str) -> List[Dict[str,Any]]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT * FROM mailbox_events
+         WHERE user_id=%s AND device_id=%s
+         ORDER BY timestamp DESC
+    """, (user_id, device_id))
+    rows = cursor.fetchall()
+    cursor.close(); conn.close()
+    return rows
+
+# 6) CRUD for mail weight readings
+def add_mail_weight_db(email: str, device_id: str, weight: float, unit: str, ts: datetime) -> Dict[str,int]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO mail_weight (user_id, device_id, weight, unit, timestamp) VALUES (%s,%s,%s,%s,%s)",
+        (user_id, device_id, weight, unit, ts)
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    cursor.close(); conn.close()
+    return {"id": new_id}
+
+def get_mail_weight_db(email: str, device_id: str) -> List[Dict[str,Any]]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT * FROM mail_weight
+         WHERE user_id=%s AND device_id=%s
+         ORDER BY timestamp DESC
+    """, (user_id, device_id))
+    rows = cursor.fetchall()
+    cursor.close(); conn.close()
+    return rows
+
+# 7) CRUD for images (S3 URLs only)
+def add_image_record_db(email: str, device_id: str, image_url: str, ts: datetime) -> Dict[str,int]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO images (user_id, device_id, image_url, timestamp) VALUES (%s,%s,%s,%s)",
+        (user_id, device_id, image_url, ts)
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    cursor.close(); conn.close()
+    return {"id": new_id}
+
+def get_images_db(email: str, device_id: str) -> List[Dict[str,Any]]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT * FROM images
+         WHERE user_id=%s AND device_id=%s
+         ORDER BY timestamp DESC
+    """, (user_id, device_id))
+    rows = cursor.fetchall()
+    cursor.close(); conn.close()
+    return rows
+
+# 8) CRUD for notifications
+def add_notification_db(email: str, device_id: str, ntype: str) -> Dict[str,int]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO notifications (user_id, device_id, notification_type) VALUES (%s,%s,%s)",
+        (user_id, device_id, ntype)
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    cursor.close(); conn.close()
+    return {"id": new_id}
+
+def get_notifications_db(email: str) -> List[Dict[str,Any]]:
+    user_id = get_user_id_by_email(email)
+    conn = get_mysql_connection(); cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT * FROM notifications
+         WHERE user_id=%s
+         ORDER BY sent_at DESC
+    """, (user_id,))
+    rows = cursor.fetchall()
+    cursor.close(); conn.close()
+    return rows

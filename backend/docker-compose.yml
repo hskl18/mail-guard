@@ -1,27 +1,16 @@
-services:
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: lab_8
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-    ports:
-      - '3306:3306'
-    volumes:
-      - ./data:/var/lib/mysql
+version: "3.8"
 
+services:
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mailbox_api
     ports:
-      - '8000:8000'
-    volumes:
-      - ./app:/app
-    depends_on:
-      - mysql
-    restart: always
+      - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - MYSQL_HOST=mysql
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password
-      - MYSQL_DATABASE=lab_8
+      # re‑export the DATABASE_URL from .env so your app can read it
+      DATABASE_URL: "${DATABASE_URL}"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
