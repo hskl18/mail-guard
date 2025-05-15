@@ -2,6 +2,8 @@
 
 This is the backend service for the Smart Mailbox Monitor project, built with FastAPI and MySQL.
 
+Live Application: [https://mail-guard.onrender.com/](https://mail-guard.onrender.com/)
+
 ## Features
 
 - RESTful API for smart mailbox monitoring
