@@ -2,19 +2,25 @@ version: "3.8"
 
 services:
   api:
-    build: .
-    container_name: mailbox_api
+    build:
+      context: .
+      target: runtime # <- final stage
     env_file: .env
-    volumes:
-      - ./certs:/certs:ro
+    container_name: mailbox_api
     ports:
       - "8000:8000"
     restart: unless-stopped
-    command: >
-      uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+      interval: 30s
+      retries: 3
+      timeout: 5s
+
   test:
-    build: .
+    build:
+      context: .
+      target: builder # <- stage that has pytest
     env_file: .env
+    command: pytest -q
     volumes:
       - ./certs:/certs:ro
-    command: pytest -q

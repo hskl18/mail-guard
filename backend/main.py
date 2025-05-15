@@ -1,11 +1,6 @@
-"""
-Smart-Mailbox Monitor API 
-----------------------------------------------
-• MySQL bootstrap (CREATE DATABASE & CREATE TABLE IF NOT EXISTS)
-• Connection pooling (mysql-connector-python)
-•  coarse resources: mailbox_events, images, notifications
-• Pydantic request models
-• CRUD endpoints: POST (create) & GET (list)
+"""Smart Mailbox Monitor – FastAPI backend
+================================================
+Complete main.py with an HTML landing page at "/" and all API routes.
 """
 
 import os
@@ -15,33 +10,36 @@ from typing import Any, Dict, List, Optional
 import mysql.connector
 from mysql.connector import pooling
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi.responses import HTMLResponse
 
 # --------------------------------------------------------------------------- #
-# 1.  Environment & pool
+# 1.  Environment & connection pooling
 # --------------------------------------------------------------------------- #
-DB = {
+DB: Dict[str, Any] = {
     "host":     os.getenv("MYSQL_HOST"),
     "port":     int(os.getenv("MYSQL_PORT", 3306)),
     "user":     os.getenv("MYSQL_USER"),
     "password": os.getenv("MYSQL_PASSWORD"),
     "database": os.getenv("MYSQL_DATABASE"),
-    "ssl_ca":   os.getenv("MYSQL_SSL_CA"),  
+    "ssl_ca":   os.getenv("MYSQL_SSL_CA"),
     "ssl_verify_cert": True,
 }
 
-# Initialize pool as None, will be set during startup
-POOL = None
+POOL: Optional[pooling.MySQLConnectionPool] = None
 
-def init_pool():
-    """Initialize the database pool. Can be called multiple times safely."""
+def init_pool() -> None:
+    """Initialise connection pool (idempotent)."""
     global POOL
     if POOL is None:
         _bootstrap_database()
-        POOL = pooling.MySQLConnectionPool(pool_name="mailbox_pool", pool_size=10, **DB)
+        POOL = pooling.MySQLConnectionPool(
+            pool_name="mailbox_pool", pool_size=10, **DB
+        )
 
 
 def _bootstrap_database() -> None:
+    """Create database & tables if they don't yet exist."""
+    # Ensure database exists
     with mysql.connector.connect(**{k: v for k, v in DB.items() if k != "database"}) as root:
         root.cursor().execute(f"CREATE DATABASE IF NOT EXISTS {DB['database']}")
 
@@ -113,13 +111,13 @@ def _bootstrap_database() -> None:
 def _pool() -> mysql.connector.MySQLConnection:
     try:
         return POOL.get_connection()
-    except mysql.connector.Error as e:
-        raise HTTPException(500, f"MySQL pool error: {e}")
-
+    except mysql.connector.Error as exc:
+        raise HTTPException(500, f"MySQL pool error: {exc}")
 
 # --------------------------------------------------------------------------- #
-# 2.  Helpers
+# 2.  Helper functions
 # --------------------------------------------------------------------------- #
+
 def _user_id(email: str) -> int:
     with _pool() as conn:
         cur = conn.cursor(dictionary=True)
@@ -144,15 +142,15 @@ def _select(sql: str, params: tuple) -> List[Dict[str, Any]]:
         cur.execute(sql, params)
         return cur.fetchall()
 
+# --------------------------------------------------------------------------- #
+# 3.  Pydantic request models
+# --------------------------------------------------------------------------- #
+from pydantic import BaseModel
 
-# --------------------------------------------------------------------------- #
-# 3.  Request models
-# --------------------------------------------------------------------------- #
 class _BasePayload(BaseModel):
     email: str
     device_id: str
     timestamp: Optional[datetime] = None
-
 
 class DevicePayload(BaseModel):
     email: str
@@ -161,85 +159,95 @@ class DevicePayload(BaseModel):
     location: Optional[str] = None
     firmware_version: Optional[str] = None
 
-
 class MailboxEventPayload(_BasePayload):
     event_type: str
 
-
 class ImageRecordPayload(_BasePayload):
     image_url: str
-
 
 class NotificationPayload(BaseModel):
     email: str
     device_id: str
     notification_type: str
 
+# --------------------------------------------------------------------------- #
+# 4.  FastAPI application
+# --------------------------------------------------------------------------- #
 
-# --------------------------------------------------------------------------- #
-# 4.  FastAPI
-# --------------------------------------------------------------------------- #
 app = FastAPI(
     title="Smart Mailbox Monitor API",
-    description="""
-    A comprehensive API for monitoring smart mailboxes. This API provides endpoints for:
-    
-    * Device Management - Register and manage smart mailbox devices
-    * Mailbox Events - Track mailbox open/close events
-    * Image Storage - Store and retrieve mailbox images
-    * Notifications - Handle mailbox notifications
-    
-    For detailed API documentation, visit:
-    * Swagger UI: `/docs`
-    * ReDoc: `/redoc`
-    """,
+    description=(
+        "A comprehensive API for monitoring smart mailboxes.\n\n"
+        "* Device Management – Register and manage smart mailbox devices\n"
+        "* Mailbox Events – Track mailbox open/close events\n"
+        "* Image Storage – Store and retrieve mailbox images\n"
+        "* Notifications – Handle mailbox notifications"
+    ),
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-@app.get("/", tags=["Root"])
-async def root():
+# --------------------------------------------------------------------------- #
+# 4a.  Landing page (HTML) – excludes from OpenAPI schema
+# --------------------------------------------------------------------------- #
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def landing_page() -> str:
+    """Human‑friendly landing page instead of raw JSON."""
+    return """
+    <!DOCTYPE html>
+    <html lang=\"en\">
+    <head>
+        <meta charset=\"utf-8\" />
+        <title>Smart Mailbox Monitor API</title>
+        <style>
+            body { font-family: system-ui, sans-serif; margin: 3rem auto; max-width: 600px; line-height: 1.6; }
+            code { background: #f5f5f5; padding: 0.15rem 0.35rem; border-radius: 4px; }
+            a { color: #0070f3; text-decoration: none; }
+            a:hover { text-decoration: underline; }
+            pre { white-space: pre-wrap; }
+        </style>
+    </head>
+    <body>
+        <h1>Smart Mailbox Monitor API</h1>
+        <p>This backend powers the Smart Mailbox Monitor project.</p>
+
+        <h2>Interactive Documentation</h2>
+        <ul>
+            <li><a href=\"/docs\">Swagger UI</a></li>
+            <li><a href=\"/redoc\">ReDoc</a></li>
+        </ul>
+
+        <h2>Key Endpoints</h2>
+        <pre><code>
+POST /devices                  Register a new device
+GET  /devices                  List a user's devices
+PUT  /devices/{device_id}      Update device info
+POST /mailbox/events           Record an open/close event
+GET  /mailbox/events           List events for a device
+POST /mailbox/images           Save an image URL
+GET  /mailbox/images           List images for a device
+POST /mailbox/notifications    Record a notification
+GET  /mailbox/notifications    List notifications for a user
+        </code></pre>
+        <p>🐳  Running inside Docker on <code>0.0.0.0:8000</code></p>
+    </body>
+    </html>
     """
-    Root endpoint that provides basic API information and available endpoints.
-    """
-    return {
-        "name": "Smart Mailbox Monitor API",
-        "version": "1.0.0",
-        "description": "API for monitoring smart mailboxes",
-        "documentation": {
-            "swagger": "/docs",
-            "redoc": "/redoc"
-        },
-        "endpoints": {
-            "devices": {
-                "path": "/devices",
-                "methods": ["GET", "POST", "PUT"],
-                "description": "Device management endpoints"
-            },
-            "mailbox_events": {
-                "path": "/mailbox/events",
-                "methods": ["GET", "POST"],
-                "description": "Mailbox event tracking"
-            },
-            "images": {
-                "path": "/mailbox/images",
-                "methods": ["GET", "POST"],
-                "description": "Image storage and retrieval"
-            },
-            "notifications": {
-                "path": "/mailbox/notifications",
-                "methods": ["GET", "POST"],
-                "description": "Notification handling"
-            }
-        }
-    }
+
+# --------------------------------------------------------------------------- #
+# 5.  Startup event – create pool
+# --------------------------------------------------------------------------- #
 
 @app.on_event("startup")
-def _startup():
+def _on_startup() -> None:
     init_pool()
 
-# --- devices ---------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 6.  Devices CRUD
+# --------------------------------------------------------------------------- #
+
 @app.post("/devices", response_model=Dict[str, int])
 def create_device(p: DevicePayload):
     return _insert(
@@ -268,7 +276,10 @@ def update_device(device_id: str, p: DevicePayload):
         conn.commit()
         return {"id": cur.lastrowid}
 
-# --- mailbox events -------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 7.  Mailbox events
+# --------------------------------------------------------------------------- #
+
 @app.post("/mailbox/events", response_model=Dict[str, int])
 def create_event(p: MailboxEventPayload):
     ts = p.timestamp or datetime.utcnow()
@@ -284,7 +295,10 @@ def list_events(email: str, device_id: str):
         (_user_id(email), device_id),
     )
 
-# --- images ---------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 8.  Images
+# --------------------------------------------------------------------------- #
+
 @app.post("/mailbox/images", response_model=Dict[str, int])
 def create_image(p: ImageRecordPayload):
     ts = p.timestamp or datetime.utcnow()
@@ -300,7 +314,10 @@ def list_images(email: str, device_id: str):
         (_user_id(email), device_id),
     )
 
-# --- notifications --------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# 9.  Notifications
+# --------------------------------------------------------------------------- #
+
 @app.post("/mailbox/notifications", response_model=Dict[str, int])
 def create_notification(p: NotificationPayload):
     return _insert(
