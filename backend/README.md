@@ -102,3 +102,10 @@ The backend automatically creates the following tables:
 - notifications
 
 Each table is properly indexed and includes foreign key constraints for data integrity.
+
+## To Restart and Rebuild the Docker Container
+
+```bash
+docker compose down -v
+docker compose up --build
+```
