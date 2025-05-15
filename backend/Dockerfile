@@ -1,21 +1,20 @@
-# Use a slim official Python image
+# ---- build image ----
 FROM python:3.11-slim
 
-# Set working directory
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc libmariadb-dev curl tini && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy requirements (adjust if you’re using poetry/pyproject.toml instead)
+# ❶ install runtime + test deps
 COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir pytest          # ← add pytest here
 
-# Install runtime dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the app
+# ❷ copy *everything* so the tests directory is inside the image
 COPY . .
 
-# Expose the port that Uvicorn will run on
 EXPOSE 8000
-
-# Default command
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

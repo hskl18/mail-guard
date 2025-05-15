@@ -1,16 +1,20 @@
 version: "3.8"
 
 services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  api:
+    build: .
     container_name: mailbox_api
+    env_file: .env
+    volumes:
+      - ./certs:/certs:ro
     ports:
       - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      # re‑export the DATABASE_URL from .env so your app can read it
-      DATABASE_URL: "${DATABASE_URL}"
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    command: >
+      uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers
+  test:
+    build: .
+    env_file: .env
+    volumes:
+      - ./certs:/certs:ro
+    command: pytest -q

@@ -1,87 +1,262 @@
+"""
+Smart-Mailbox Monitor API 
+----------------------------------------------
+• MySQL bootstrap (CREATE DATABASE & CREATE TABLE IF NOT EXISTS)
+• Connection pooling (mysql-connector-python)
+•  coarse resources: mailbox_events, images, notifications
+• Pydantic request models
+• CRUD endpoints: POST (create) & GET (list)
+"""
+
 import os
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
+import mysql.connector
+from mysql.connector import pooling
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.database import (
-    seed_db,
-    add_mailbox_event_db,
-    get_mailbox_events_db,
-    add_mail_weight_db,
-    get_mail_weight_db,
-    add_image_record_db,
-    get_images_db,
-    add_notification_db,
-    get_notifications_db,
-)
+# --------------------------------------------------------------------------- #
+# 1.  Environment & pool
+# --------------------------------------------------------------------------- #
+DB = {
+    "host":     os.getenv("MYSQL_HOST"),
+    "port":     int(os.getenv("MYSQL_PORT", 3306)),
+    "user":     os.getenv("MYSQL_USER"),
+    "password": os.getenv("MYSQL_PASSWORD"),
+    "database": os.getenv("MYSQL_DATABASE"),
+    "ssl_ca":   os.getenv("MYSQL_SSL_CA"),  
+    "ssl_verify_cert": True,
+}
 
-# --- Pydantic models for request bodies ---
-class MailboxEventPayload(BaseModel):
+# Initialize pool as None, will be set during startup
+POOL = None
+
+def init_pool():
+    """Initialize the database pool. Can be called multiple times safely."""
+    global POOL
+    if POOL is None:
+        _bootstrap_database()
+        POOL = pooling.MySQLConnectionPool(pool_name="mailbox_pool", pool_size=10, **DB)
+
+
+def _bootstrap_database() -> None:
+    with mysql.connector.connect(**{k: v for k, v in DB.items() if k != "database"}) as root:
+        root.cursor().execute(f"CREATE DATABASE IF NOT EXISTS {DB['database']}")
+
+    ddl = {
+        "users": """
+          CREATE TABLE IF NOT EXISTS users(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            full_name VARCHAR(255),
+            email VARCHAR(255) UNIQUE,
+            username VARCHAR(50) UNIQUE,
+            password VARCHAR(255),
+            region VARCHAR(100),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB
+        """,
+        "devices": """
+          CREATE TABLE IF NOT EXISTS devices(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            device_name VARCHAR(255),
+            device_id VARCHAR(255) UNIQUE,
+            location VARCHAR(255),
+            firmware_version VARCHAR(50),
+            is_active BOOLEAN DEFAULT TRUE,
+            last_seen DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          ) ENGINE=InnoDB
+        """,
+        "mailbox_events": """
+          CREATE TABLE IF NOT EXISTS mailbox_events(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            device_id VARCHAR(255),
+            event_type ENUM('open','close') NOT NULL,
+            timestamp DATETIME NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          ) ENGINE=InnoDB
+        """,
+        "images": """
+          CREATE TABLE IF NOT EXISTS images(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            device_id VARCHAR(255),
+            image_url VARCHAR(2083),
+            timestamp DATETIME NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          ) ENGINE=InnoDB
+        """,
+        "notifications": """
+          CREATE TABLE IF NOT EXISTS notifications(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            device_id VARCHAR(255),
+            notification_type VARCHAR(50),
+            sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          ) ENGINE=InnoDB
+        """,
+    }
+
+    with mysql.connector.connect(**DB) as conn:
+        cur = conn.cursor()
+        for stmt in ddl.values():
+            cur.execute(stmt)
+        conn.commit()
+
+
+def _pool() -> mysql.connector.MySQLConnection:
+    try:
+        return POOL.get_connection()
+    except mysql.connector.Error as e:
+        raise HTTPException(500, f"MySQL pool error: {e}")
+
+
+# --------------------------------------------------------------------------- #
+# 2.  Helpers
+# --------------------------------------------------------------------------- #
+def _user_id(email: str) -> int:
+    with _pool() as conn:
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, f"No user found for email '{email}'")
+    return row["id"]
+
+
+def _insert(sql: str, params: tuple) -> Dict[str, int]:
+    with _pool() as conn:
+        cur = conn.cursor()
+        cur.execute(sql, params)
+        conn.commit()
+        return {"id": cur.lastrowid}
+
+
+def _select(sql: str, params: tuple) -> List[Dict[str, Any]]:
+    with _pool() as conn:
+        cur = conn.cursor(dictionary=True)
+        cur.execute(sql, params)
+        return cur.fetchall()
+
+
+# --------------------------------------------------------------------------- #
+# 3.  Request models
+# --------------------------------------------------------------------------- #
+class _BasePayload(BaseModel):
     email: str
     device_id: str
-    event_type: str  # "open" or "close"
     timestamp: Optional[datetime] = None
 
-class MailWeightPayload(BaseModel):
-    email: str
-    device_id: str
-    weight: float
-    unit: str
-    timestamp: Optional[datetime] = None
 
-class ImageRecordPayload(BaseModel):
+class DevicePayload(BaseModel):
     email: str
+    device_name: str
     device_id: str
-    image_url: str     # full S3 URL
-    timestamp: Optional[datetime] = None
+    location: Optional[str] = None
+    firmware_version: Optional[str] = None
+
+
+class MailboxEventPayload(_BasePayload):
+    event_type: str
+
+
+class ImageRecordPayload(_BasePayload):
+    image_url: str
+
 
 class NotificationPayload(BaseModel):
     email: str
     device_id: str
     notification_type: str
 
-# --- App setup ---
-app = FastAPI(title="Smart Mailbox Monitor API")
+
+# --------------------------------------------------------------------------- #
+# 4.  FastAPI
+# --------------------------------------------------------------------------- #
+app = FastAPI(title="Smart Mailbox Monitor API (no weight)")
 
 @app.on_event("startup")
-def on_startup():
-    # ensure all tables exist
-    seed_db()
+def _startup():
+    init_pool()
 
-# --- Endpoints ---
-@app.post("/mailbox/events", response_model=Dict[str,int])
-def create_mailbox_event(payload: MailboxEventPayload):
-    ts = payload.timestamp or datetime.utcnow()
-    return add_mailbox_event_db(payload.email, payload.device_id, payload.event_type, ts)
+# --- devices ---------------------------------------------------------------- #
+@app.post("/devices", response_model=Dict[str, int])
+def create_device(p: DevicePayload):
+    return _insert(
+        """INSERT INTO devices(user_id,device_name,device_id,location,firmware_version)
+           VALUES (%s,%s,%s,%s,%s)""",
+        (_user_id(p.email), p.device_name, p.device_id, p.location, p.firmware_version),
+    )
 
-@app.get("/mailbox/events", response_model=List[Dict[str,Any]])
-def read_mailbox_events(email: str, device_id: str):
-    return get_mailbox_events_db(email, device_id)
+@app.get("/devices", response_model=List[Dict[str, Any]])
+def list_devices(email: str):
+    return _select(
+        "SELECT * FROM devices WHERE user_id=%s ORDER BY created_at DESC",
+        (_user_id(email),),
+    )
 
-@app.post("/mailbox/weight", response_model=Dict[str,int])
-def create_mail_weight(payload: MailWeightPayload):
-    ts = payload.timestamp or datetime.utcnow()
-    return add_mail_weight_db(payload.email, payload.device_id, payload.weight, payload.unit, ts)
+@app.put("/devices/{device_id}", response_model=Dict[str, int])
+def update_device(device_id: str, p: DevicePayload):
+    with _pool() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """UPDATE devices 
+               SET device_name=%s, location=%s, firmware_version=%s, last_seen=NOW()
+               WHERE device_id=%s AND user_id=%s""",
+            (p.device_name, p.location, p.firmware_version, device_id, _user_id(p.email)),
+        )
+        conn.commit()
+        return {"id": cur.lastrowid}
 
-@app.get("/mailbox/weight", response_model=List[Dict[str,Any]])
-def read_mail_weight(email: str, device_id: str):
-    return get_mail_weight_db(email, device_id)
+# --- mailbox events -------------------------------------------------------- #
+@app.post("/mailbox/events", response_model=Dict[str, int])
+def create_event(p: MailboxEventPayload):
+    ts = p.timestamp or datetime.utcnow()
+    return _insert(
+        "INSERT INTO mailbox_events(user_id,device_id,event_type,timestamp) VALUES (%s,%s,%s,%s)",
+        (_user_id(p.email), p.device_id, p.event_type, ts),
+    )
 
-@app.post("/mailbox/images", response_model=Dict[str,int])
-def create_image_record(payload: ImageRecordPayload):
-    ts = payload.timestamp or datetime.utcnow()
-    return add_image_record_db(payload.email, payload.device_id, payload.image_url, ts)
+@app.get("/mailbox/events", response_model=List[Dict[str, Any]])
+def list_events(email: str, device_id: str):
+    return _select(
+        "SELECT * FROM mailbox_events WHERE user_id=%s AND device_id=%s ORDER BY timestamp DESC",
+        (_user_id(email), device_id),
+    )
 
-@app.get("/mailbox/images", response_model=List[Dict[str,Any]])
-def read_images(email: str, device_id: str):
-    return get_images_db(email, device_id)
+# --- images ---------------------------------------------------------------- #
+@app.post("/mailbox/images", response_model=Dict[str, int])
+def create_image(p: ImageRecordPayload):
+    ts = p.timestamp or datetime.utcnow()
+    return _insert(
+        "INSERT INTO images(user_id,device_id,image_url,timestamp) VALUES (%s,%s,%s,%s)",
+        (_user_id(p.email), p.device_id, p.image_url, ts),
+    )
 
-@app.post("/mailbox/notifications", response_model=Dict[str,int])
-def create_notification(payload: NotificationPayload):
-    return add_notification_db(payload.email, payload.device_id, payload.notification_type)
+@app.get("/mailbox/images", response_model=List[Dict[str, Any]])
+def list_images(email: str, device_id: str):
+    return _select(
+        "SELECT * FROM images WHERE user_id=%s AND device_id=%s ORDER BY timestamp DESC",
+        (_user_id(email), device_id),
+    )
 
-@app.get("/mailbox/notifications", response_model=List[Dict[str,Any]])
-def read_notifications(email: str):
-    return get_notifications_db(email)
+# --- notifications --------------------------------------------------------- #
+@app.post("/mailbox/notifications", response_model=Dict[str, int])
+def create_notification(p: NotificationPayload):
+    return _insert(
+        "INSERT INTO notifications(user_id,device_id,notification_type) VALUES (%s,%s,%s)",
+        (_user_id(p.email), p.device_id, p.notification_type),
+    )
+
+@app.get("/mailbox/notifications", response_model=List[Dict[str, Any]])
+def list_notifications(email: str):
+    return _select(
+        "SELECT * FROM notifications WHERE user_id=%s ORDER BY sent_at DESC",
+        (_user_id(email),),
+    )
