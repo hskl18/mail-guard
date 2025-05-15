@@ -179,7 +179,61 @@ class NotificationPayload(BaseModel):
 # --------------------------------------------------------------------------- #
 # 4.  FastAPI
 # --------------------------------------------------------------------------- #
-app = FastAPI(title="Smart Mailbox Monitor API (no weight)")
+app = FastAPI(
+    title="Smart Mailbox Monitor API",
+    description="""
+    A comprehensive API for monitoring smart mailboxes. This API provides endpoints for:
+    
+    * Device Management - Register and manage smart mailbox devices
+    * Mailbox Events - Track mailbox open/close events
+    * Image Storage - Store and retrieve mailbox images
+    * Notifications - Handle mailbox notifications
+    
+    For detailed API documentation, visit:
+    * Swagger UI: `/docs`
+    * ReDoc: `/redoc`
+    """,
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+@app.get("/", tags=["Root"])
+async def root():
+    """
+    Root endpoint that provides basic API information and available endpoints.
+    """
+    return {
+        "name": "Smart Mailbox Monitor API",
+        "version": "1.0.0",
+        "description": "API for monitoring smart mailboxes",
+        "documentation": {
+            "swagger": "/docs",
+            "redoc": "/redoc"
+        },
+        "endpoints": {
+            "devices": {
+                "path": "/devices",
+                "methods": ["GET", "POST", "PUT"],
+                "description": "Device management endpoints"
+            },
+            "mailbox_events": {
+                "path": "/mailbox/events",
+                "methods": ["GET", "POST"],
+                "description": "Mailbox event tracking"
+            },
+            "images": {
+                "path": "/mailbox/images",
+                "methods": ["GET", "POST"],
+                "description": "Image storage and retrieval"
+            },
+            "notifications": {
+                "path": "/mailbox/notifications",
+                "methods": ["GET", "POST"],
+                "description": "Notification handling"
+            }
+        }
+    }
 
 @app.on_event("startup")
 def _startup():
