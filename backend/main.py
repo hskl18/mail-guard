@@ -189,7 +189,7 @@ app = FastAPI(
 )
 
 # --------------------------------------------------------------------------- #
-# 4a.  Landing page (HTML) – excludes from OpenAPI schema
+# 4a.  Landing page (HTML) 
 # --------------------------------------------------------------------------- #
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
@@ -197,41 +197,190 @@ async def landing_page() -> str:
     """Human‑friendly landing page instead of raw JSON."""
     return """
     <!DOCTYPE html>
-    <html lang=\"en\">
+    <html lang="en">
     <head>
-        <meta charset=\"utf-8\" />
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Smart Mailbox Monitor API</title>
         <style>
-            body { font-family: system-ui, sans-serif; margin: 3rem auto; max-width: 600px; line-height: 1.6; }
-            code { background: #f5f5f5; padding: 0.15rem 0.35rem; border-radius: 4px; }
-            a { color: #0070f3; text-decoration: none; }
-            a:hover { text-decoration: underline; }
-            pre { white-space: pre-wrap; }
+            :root {
+                --primary-color: #0070f3;
+                --bg-color: #fafafa;
+                --text-color: #333;
+                --code-bg: #f5f5f5;
+                --border-radius: 8px;
+            }
+            
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                line-height: 1.6;
+                color: var(--text-color);
+                background: var(--bg-color);
+                padding: 2rem;
+            }
+            
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                padding: 2rem;
+                border-radius: var(--border-radius);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            }
+            
+            h1 {
+                color: var(--primary-color);
+                margin-bottom: 1.5rem;
+                font-size: 2.5rem;
+            }
+            
+            h2 {
+                color: var(--text-color);
+                margin: 2rem 0 1rem;
+                font-size: 1.5rem;
+            }
+            
+            p {
+                margin-bottom: 1rem;
+            }
+            
+            ul {
+                list-style: none;
+                margin: 1rem 0;
+            }
+            
+            li {
+                margin: 0.5rem 0;
+            }
+            
+            a {
+                color: var(--primary-color);
+                text-decoration: none;
+                font-weight: 500;
+                transition: color 0.2s ease;
+            }
+            
+            a:hover {
+                color: #0051a8;
+                text-decoration: underline;
+            }
+            
+            code {
+                background: var(--code-bg);
+                padding: 0.2rem 0.4rem;
+                border-radius: 4px;
+                font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+                font-size: 0.9em;
+            }
+            
+            pre {
+                background: var(--code-bg);
+                padding: 1rem;
+                border-radius: var(--border-radius);
+                overflow-x: auto;
+                margin: 1rem 0;
+            }
+            
+            pre code {
+                background: none;
+                padding: 0;
+            }
+            
+            .endpoint {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin: 0.5rem 0;
+            }
+            
+            .method {
+                font-weight: bold;
+                min-width: 60px;
+            }
+            
+            .path {
+                font-family: monospace;
+            }
+            
+            .footer {
+                margin-top: 2rem;
+                padding-top: 1rem;
+                border-top: 1px solid #eee;
+                font-size: 0.9rem;
+                color: #666;
+            }
         </style>
     </head>
     <body>
-        <h1>Smart Mailbox Monitor API</h1>
-        <p>This backend powers the Smart Mailbox Monitor project.</p>
+        <div class="container">
+            <h1>Smart Mailbox Monitor API</h1>
+            <p>Welcome to the Smart Mailbox Monitor API backend. This service provides a comprehensive set of endpoints for managing and monitoring smart mailbox devices.</p>
 
-        <h2>Interactive Documentation</h2>
-        <ul>
-            <li><a href=\"/docs\">Swagger UI</a></li>
-            <li><a href=\"/redoc\">ReDoc</a></li>
-        </ul>
+            <h2>Interactive Documentation</h2>
+            <ul>
+                <li><a href="/docs">📚 Swagger UI</a> - Interactive API documentation with testing capabilities</li>
+                <li><a href="/redoc">📖 ReDoc</a> - Alternative API documentation with a clean interface</li>
+            </ul>
 
-        <h2>Key Endpoints</h2>
-        <pre><code>
-POST /devices                  Register a new device
-GET  /devices                  List a user's devices
-PUT  /devices/{device_id}      Update device info
-POST /mailbox/events           Record an open/close event
-GET  /mailbox/events           List events for a device
-POST /mailbox/images           Save an image URL
-GET  /mailbox/images           List images for a device
-POST /mailbox/notifications    Record a notification
-GET  /mailbox/notifications    List notifications for a user
-        </code></pre>
-        <p>🐳  Running inside Docker on <code>0.0.0.0:8000</code></p>
+            <h2>Key Endpoints</h2>
+            <div class="endpoints">
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/devices</span>
+                    <span>Register a new device</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/devices</span>
+                    <span>List a user's devices</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">PUT</span>
+                    <span class="path">/devices/{device_id}</span>
+                    <span>Update device info</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/mailbox/events</span>
+                    <span>Record an open/close event</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/mailbox/events</span>
+                    <span>List events for a device</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/mailbox/images</span>
+                    <span>Save an image URL</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/mailbox/images</span>
+                    <span>List images for a device</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/mailbox/notifications</span>
+                    <span>Record a notification</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/mailbox/notifications</span>
+                    <span>List notifications for a user</span>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>🐳 Running inside Docker on <code>0.0.0.0:8000</code></p>
+            </div>
+        </div>
     </body>
     </html>
     """
