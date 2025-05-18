@@ -1,47 +1,35 @@
 """Smart Mailbox Monitor – FastAPI backend
 ================================================
-main.py with an HTML landing page at "/" and all API routes.
+Complete main.py with an HTML landing page at "/" and all API routes.
 """
+
 import os
-import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import mysql.connector
 from mysql.connector import pooling
-from fastapi import FastAPI, HTTPException, Request, Header
-from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
-
-# Import your notification sender
-from backend.notify_user import send_notification
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from contextlib import asynccontextmanager
 
 # --------------------------------------------------------------------------- #
-# Configuration & Folders
+# 1.  Environment & connection pooling
 # --------------------------------------------------------------------------- #
 DB: Dict[str, Any] = {
-    "host": os.getenv("MYSQL_HOST"),
-    "port": int(os.getenv("MYSQL_PORT", 3306)),
-    "user": os.getenv("MYSQL_USER"),
+    "host":     os.getenv("MYSQL_HOST"),
+    "port":     int(os.getenv("MYSQL_PORT", 3306)),
+    "user":     os.getenv("MYSQL_USER"),
     "password": os.getenv("MYSQL_PASSWORD"),
     "database": os.getenv("MYSQL_DATABASE"),
-    "ssl_ca": os.getenv("MYSQL_SSL_CA"),
+    "ssl_ca":   os.getenv("MYSQL_SSL_CA"),
     "ssl_verify_cert": True,
 }
 
-UPLOAD_FOLDER = "uploads"
-STATIC_FOLDER = "static"
-LOG_FILE = "weight_log.json"
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(STATIC_FOLDER, exist_ok=True)
-
-# --------------------------------------------------------------------------- #
-# Database pool setup
-# --------------------------------------------------------------------------- #
 POOL: Optional[pooling.MySQLConnectionPool] = None
 
 def init_pool() -> None:
+    """Initialise connection pool (idempotent)."""
     global POOL
     if POOL is None:
         _bootstrap_database()
@@ -51,6 +39,7 @@ def init_pool() -> None:
 
 
 def _bootstrap_database() -> None:
+    """Create database & tables if they don't yet exist."""
     # Ensure database exists
     with mysql.connector.connect(**{k: v for k, v in DB.items() if k != "database"}) as root:
         root.cursor().execute(f"CREATE DATABASE IF NOT EXISTS {DB['database']}")
@@ -127,7 +116,7 @@ def _pool() -> mysql.connector.MySQLConnection:
         raise HTTPException(500, f"MySQL pool error: {exc}")
 
 # --------------------------------------------------------------------------- #
-# Helper functions
+# 2.  Helper functions
 # --------------------------------------------------------------------------- #
 
 def _user_id(email: str) -> int:
@@ -155,8 +144,10 @@ def _select(sql: str, params: tuple) -> List[Dict[str, Any]]:
         return cur.fetchall()
 
 # --------------------------------------------------------------------------- #
-# Pydantic request models
+# 3.  Pydantic request models
 # --------------------------------------------------------------------------- #
+from pydantic import BaseModel
+
 class _BasePayload(BaseModel):
     email: str
     device_id: str
@@ -181,8 +172,19 @@ class NotificationPayload(BaseModel):
     notification_type: str
 
 # --------------------------------------------------------------------------- #
-# FastAPI application
+# 4.  FastAPI application
 # --------------------------------------------------------------------------- #
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for FastAPI application."""
+    # Startup
+    init_pool()
+    yield
+    # Shutdown
+    if POOL is not None:
+        POOL.close()
+
 app = FastAPI(
     title="Smart Mailbox Monitor API",
     description=(
@@ -195,17 +197,16 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
-@app.on_event("startup")
-def on_startup() -> None:
-    init_pool()
+# --------------------------------------------------------------------------- #
+# 4a.  Landing page (HTML) 
+# --------------------------------------------------------------------------- #
 
-# --------------------------------------------------------------------------- #
-### Landing page
-# --------------------------------------------------------------------------- #
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def landing_page() -> str:
+    """Human‑friendly landing page instead of raw JSON."""
     return """
     <!DOCTYPE html>
     <html lang="en">
@@ -221,7 +222,13 @@ async def landing_page() -> str:
                 --code-bg: #f5f5f5;
                 --border-radius: 8px;
             }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
+            
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
             body {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
                 line-height: 1.6;
@@ -229,6 +236,7 @@ async def landing_page() -> str:
                 background: var(--bg-color);
                 padding: 2rem;
             }
+            
             .container {
                 max-width: 800px;
                 margin: 0 auto;
@@ -237,49 +245,160 @@ async def landing_page() -> str:
                 border-radius: var(--border-radius);
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             }
-            h1 { color: var(--primary-color); margin-bottom: 1.5rem; font-size: 2.5rem; }
-            h2 { color: var(--text-color); margin: 2rem 0 1rem; font-size: 1.5rem; }
-            p { margin-bottom: 1rem; }
-            ul { list-style: none; margin: 1rem 0; }
-            li { margin: 0.5rem 0; }
-            a { color: var(--primary-color); text-decoration: none; font-weight: 500; transition: color 0.2s ease; }
-            a:hover { color: #0051a8; text-decoration: underline; }
-            code { background: var(--code-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.9em; }
-            pre { background: var(--code-bg); padding: 1rem; border-radius: var(--border-radius); overflow-x: auto; margin: 1rem 0; }
-            pre code { background: none; padding: 0; }
-            .endpoint { display: flex; align-items: center; gap: 1rem; margin: 0.5rem 0; }
-            .method { font-weight: bold; min-width: 60px; }
-            .path { font-family: monospace; }
-            .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.9rem; color: #666; }
+            
+            h1 {
+                color: var(--primary-color);
+                margin-bottom: 1.5rem;
+                font-size: 2.5rem;
+            }
+            
+            h2 {
+                color: var(--text-color);
+                margin: 2rem 0 1rem;
+                font-size: 1.5rem;
+            }
+            
+            p {
+                margin-bottom: 1rem;
+            }
+            
+            ul {
+                list-style: none;
+                margin: 1rem 0;
+            }
+            
+            li {
+                margin: 0.5rem 0;
+            }
+            
+            a {
+                color: var(--primary-color);
+                text-decoration: none;
+                font-weight: 500;
+                transition: color 0.2s ease;
+            }
+            
+            a:hover {
+                color: #0051a8;
+                text-decoration: underline;
+            }
+            
+            code {
+                background: var(--code-bg);
+                padding: 0.2rem 0.4rem;
+                border-radius: 4px;
+                font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+                font-size: 0.9em;
+            }
+            
+            pre {
+                background: var(--code-bg);
+                padding: 1rem;
+                border-radius: var(--border-radius);
+                overflow-x: auto;
+                margin: 1rem 0;
+            }
+            
+            pre code {
+                background: none;
+                padding: 0;
+            }
+            
+            .endpoint {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin: 0.5rem 0;
+            }
+            
+            .method {
+                font-weight: bold;
+                min-width: 60px;
+            }
+            
+            .path {
+                font-family: monospace;
+            }
+            
+            .footer {
+                margin-top: 2rem;
+                padding-top: 1rem;
+                border-top: 1px solid #eee;
+                font-size: 0.9rem;
+                color: #666;
+            }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>Smart Mailbox Monitor API</h1>
             <p>Welcome to the Smart Mailbox Monitor API backend. This service provides a comprehensive set of endpoints for managing and monitoring smart mailbox devices.</p>
+
             <h2>Interactive Documentation</h2>
             <ul>
                 <li><a href="/docs">📚 Swagger UI</a> - Interactive API documentation with testing capabilities</li>
                 <li><a href="/redoc">📖 ReDoc</a> - Alternative API documentation with a clean interface</li>
             </ul>
+
             <h2>Key Endpoints</h2>
-            <div class="endpoint"><span class="method">POST</span><span class="path">/devices</span><span>Register a new device</span></div>
-            <div class="endpoint"><span class="method">GET</span><span class="path">/devices</span><span>List a user's devices</span></div>
-            <div class="endpoint"><span class="method">PUT</span><span class="path">/devices/{device_id}</span><span>Update device info</span></div>
-            <div class="endpoint"><span class="method">POST</span><span class="path">/mailbox/events</span><span>Record an open/close event</span></div>
-            <div class="endpoint"><span class="method">GET</span><span class="path">/mailbox/events</span><span>List events for a device</span></div>
-            <div class="endpoint"><span class="method">POST</span><span class="path">/mailbox/images</span><span>Save an image URL</span></div>
-            <div class="endpoint"><span class="method">GET</span><span class="path">/mailbox/images</span><span>List images for a device</span></div>
-            <div class="endpoint"><span class="method">POST</span><span class="path">/mailbox/notifications</span><span>Record a notification</span></div>
-            <div class="endpoint"><span class="method">GET</span><span class="path">/mailbox/notifications</span><span>List notifications for a user</span></div>
-            <div class="footer"><p>🐳 Running inside Docker on <code>0.0.0.0:8000</code></p></div>
+            <div class="endpoints">
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/devices</span>
+                    <span>Register a new device</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/devices</span>
+                    <span>List a user's devices</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">PUT</span>
+                    <span class="path">/devices/{device_id}</span>
+                    <span>Update device info</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/mailbox/events</span>
+                    <span>Record an open/close event</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/mailbox/events</span>
+                    <span>List events for a device</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/mailbox/images</span>
+                    <span>Save an image URL</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/mailbox/images</span>
+                    <span>List images for a device</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">POST</span>
+                    <span class="path">/mailbox/notifications</span>
+                    <span>Record a notification</span>
+                </div>
+                <div class="endpoint">
+                    <span class="method">GET</span>
+                    <span class="path">/mailbox/notifications</span>
+                    <span>List notifications for a user</span>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>🐳 Running inside Docker on <code>0.0.0.0:8000</code></p>
+            </div>
         </div>
     </body>
     </html>
     """
 
 # --------------------------------------------------------------------------- #
-# Devices CRUD
+# 5.  Devices CRUD
 # --------------------------------------------------------------------------- #
 
 @app.post("/devices", response_model=Dict[str, int])
@@ -311,7 +430,7 @@ def update_device(device_id: str, p: DevicePayload):
         return {"id": cur.lastrowid}
 
 # --------------------------------------------------------------------------- #
-# Mailbox events
+# 6.  Mailbox events
 # --------------------------------------------------------------------------- #
 
 @app.post("/mailbox/events", response_model=Dict[str, int])
@@ -330,7 +449,7 @@ def list_events(email: str, device_id: str):
     )
 
 # --------------------------------------------------------------------------- #
-# Images
+# 7.  Images
 # --------------------------------------------------------------------------- #
 
 @app.post("/mailbox/images", response_model=Dict[str, int])
@@ -349,7 +468,7 @@ def list_images(email: str, device_id: str):
     )
 
 # --------------------------------------------------------------------------- #
-# Notifications
+# 8.  Notifications
 # --------------------------------------------------------------------------- #
 
 @app.post("/mailbox/notifications", response_model=Dict[str, int])
@@ -365,39 +484,3 @@ def list_notifications(email: str):
         "SELECT * FROM notifications WHERE user_id=%s ORDER BY sent_at DESC",
         (_user_id(email),),
     )
-
-# --------------------------------------------------------------------------- #
-# Upload endpoint (binary image + weight header)
-# --------------------------------------------------------------------------- #
-
-@app.post("/upload")
-async def upload(request: Request, weight: Optional[str] = Header(None)):
-    # Read raw body
-    image_data = await request.body()
-    # Determine filename
-    filename = datetime.now().strftime("image_%Y%m%d_%H%M%S.jpg")
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    # Save to uploads folder
-    with open(filepath, "wb") as f:
-        f.write(image_data)
-    # Also update latest image
-    latest_path = os.path.join(STATIC_FOLDER, "latest.jpg")
-    with open(latest_path, "wb") as f:
-        f.write(image_data)
-    # Log the upload event
-    log_entry = {"time": datetime.now().isoformat(), "weight": weight or "unknown", "image": filename}
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, "r") as f:
-            log = json.load(f)
-    else:
-        log = []
-    log.append(log_entry)
-    with open(LOG_FILE, "w") as f:
-        json.dump(log, f, indent=2)
-    # Send notification
-    try:
-        send_notification(weight or "unknown", filename)
-    except Exception as exc:
-        return JSONResponse(status_code=500, content={"message": "Uploaded but notification failed.", "error": str(exc)})
-
-    return {"message": "Upload complete", "file": filename}
