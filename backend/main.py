@@ -9,9 +9,20 @@ from typing import Any, Dict, List, Optional
 
 import mysql.connector
 from mysql.connector import pooling
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header
+from fastapi.responses import HTMLResponse, JSONResponse
 from contextlib import asynccontextmanager
+import json
+import smtplib
+from email.message import EmailMessage
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Create uploads directory
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # --------------------------------------------------------------------------- #
 # 1.  Environment & connection pooling
@@ -484,3 +495,80 @@ def list_notifications(email: str):
         "SELECT * FROM notifications WHERE user_id=%s ORDER BY sent_at DESC",
         (_user_id(email),),
     )
+
+def send_notification(weight: str, filename: str) -> None:
+    """Send email notification with image attachment."""
+    email_address = os.getenv("EMAIL_SENDER")
+    email_password = os.getenv("EMAIL_PASSWORD")
+    receiver = os.getenv("EMAIL_RECEIVER")
+
+    if not all([email_address, email_password, receiver]):
+        raise HTTPException(500, "Email configuration missing")
+
+    msg = EmailMessage()
+    msg["Subject"] = "📬 Mailbox Triggered"
+    msg["From"] = email_address
+    msg["To"] = receiver
+    msg.set_content(f"Mailbox accessed.\nWeight: {weight}g\nImage: {filename}")
+
+    try:
+        with open(f"uploads/{filename}", "rb") as f:
+            img_data = f.read()
+            msg.add_attachment(img_data, maintype="image", subtype="jpeg", filename=filename)
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(email_address, email_password)
+            smtp.send_message(msg)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to send notification: {str(e)}")
+
+@app.post("/upload")
+async def upload_image(
+    file: UploadFile = File(...),
+    weight: str = Header(default="unknown")
+):
+    """Handle image upload and send notification."""
+    try:
+        # Read image data
+        image_data = await file.read()
+        
+        # Generate filename
+        filename = datetime.now().strftime("image_%Y%m%d_%H%M%S.jpg")
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        
+        # Save image
+        with open(filepath, "wb") as f:
+            f.write(image_data)
+        
+        # Save to static folder
+        with open("static/latest.jpg", "wb") as f:
+            f.write(image_data)
+        
+        # Update log
+        log_entry = {
+            "time": str(datetime.now()),
+            "weight": weight,
+            "image": filename
+        }
+        
+        log_file = "weight_log.json"
+        if os.path.exists(log_file):
+            with open(log_file, "r") as f:
+                log = json.load(f)
+        else:
+            log = []
+            
+        log.append(log_entry)
+        with open(log_file, "w") as f:
+            json.dump(log, f, indent=2)
+        
+        # Send notification
+        send_notification(weight, filename)
+        
+        return JSONResponse(
+            content={"message": "Upload complete"},
+            status_code=200
+        )
+        
+    except Exception as e:
+        raise HTTPException(500, f"Upload failed: {str(e)}")
