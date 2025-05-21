@@ -1,0 +1,15 @@
+FROM public.ecr.aws/lambda/python:3.11
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Ensure certificates directory exists
+RUN mkdir -p /var/task/certs
+
+# Copy certificate file explicitly
+COPY certs/rds-ca.pem /var/task/certs/rds-ca.pem
+
+# Copy application code
+COPY . .
+
+CMD ["main.handler"]

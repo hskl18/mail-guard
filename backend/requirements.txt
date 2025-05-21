@@ -1,9 +1,7 @@
 fastapi
-uvicorn[standard]
+python-multipart
+uvicorn
 mysql-connector-python
-pydantic
-python-dotenv         
-httpx
-pytest 
 python-dotenv
-python-multipart 
+boto3
+mangum

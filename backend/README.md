@@ -1,113 +1,135 @@
-# Smart Mailbox Monitor Backend
+# Smart Mailbox Backend API
 
-This is the backend service for the Smart Mailbox Monitor project, built with FastAPI and MySQL.
+This is the backend service for the Smart Mailbox Monitor system, built with FastAPI and deployed as either a local service or AWS Lambda function.
 
-Live Application: [https://mail-guard.onrender.com/](https://mail-guard.onrender.com/)
+https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws/docs#/default/create_device_devices_post
 
-## Features
+## Overview
 
-- RESTful API for smart mailbox monitoring
-- MySQL database with connection pooling
-- Secure SSL database connection
-- Docker support for easy deployment
-- Comprehensive API endpoints for:
-  - Device management
-  - Mailbox events tracking
-  - Image storage
-  - Notification handling
+The backend provides a REST API for:
 
-## Prerequisites
-
-- Python 3.8+
-- MySQL Server
-- Docker and Docker Compose (for containerized deployment)
-
-## Setup
-
-1. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-2. Set up environment variables:
-
-```bash
-MYSQL_HOST=your_host
-MYSQL_PORT=3306
-MYSQL_USER=your_user
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=mailbox_monitor
-MYSQL_SSL_CA=/etc/secrets/ca.pem # (depend how you keep the secret)
-```
-
-## Running Locally
-
-Start the development server:
-
-```bash
-uvicorn main:app --reload
-```
-
-The API will be available at `http://localhost:8000`
-
-## API Documentation
-
-Once the server is running, visit:
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-### Main Endpoints
-
-- `/devices` - Device management (POST, GET)
-- `/mailbox/events` - Mailbox event tracking (POST, GET)
-- `/mailbox/images` - Image storage (POST, GET)
-- `/mailbox/notifications` - Notification handling (POST, GET)
-
-## Docker Deployment
-
-1. Build and run using Docker Compose:
-
-```bash
-docker-compose up --build
-```
-
-2. For production deployment, ensure to:
-   - Set up proper environment variables
-   - Configure SSL certificates
-   - Use secure database credentials
-
-## Testing
-
-Run the test suite:
-
-```bash
-pytest
-```
-
-## Security Notes
-
-- Always use SSL for database connections
-- Keep your SSL certificates secure
-- Use strong passwords for database access
-- Regularly update dependencies
+- Device management with Clerk authentication integration
+- Mailbox open/close event tracking
+- Image storage (with S3 integration)
+- Notification delivery (with SES integration)
 
 ## Database Schema
 
-The backend automatically creates the following tables:
+The MySQL database consists of the following tables:
 
-- users
-- devices
-- mailbox_events
-- images
-- notifications
+- **devices** - Connected mailbox devices with clerk_id and email
 
-Each table is properly indexed and includes foreign key constraints for data integrity.
+  - id, clerk_id, email, name, location, is_active, last_seen, created_at, updated_at
 
-## To Restart and Rebuild the Docker Container
+- **mailbox_events** - Records of mailbox open/close activity
+
+  - id, device_id, event_type (open/close), occurred_at
+
+- **images** - Photos taken by mailbox devices
+
+  - id, device_id, image_url, captured_at
+
+- **notifications** - Messages sent to users about mailbox activity
+  - id, device_id, notification_type, sent_at
+
+## Environment Setup
+
+Create a `.env` file with the following variables:
+
+```
+# Database Configuration
+MYSQL_HOST=your_database_host
+MYSQL_PORT=your_database_port
+MYSQL_USER=your_database_user
+MYSQL_PASSWORD=your_database_password
+MYSQL_DATABASE=your_database_name
+MYSQL_SSL_CA=certs/rds-ca.pem
+
+# AWS Services
+S3_BUCKET=your_s3_bucket_name
+SES_SOURCE_EMAIL=your_verified_email@example.com
+AWS_REGION=us-west-2
+```
+
+## API Endpoints
+
+### Device Management
+
+- `POST /devices` - Register a new device
+- `GET /devices` - List devices for a clerk_id
+- `GET /devices/{device_id}` - Get a specific device
+- `PUT /devices/{device_id}` - Update device details
+- `DELETE /devices/{device_id}` - Remove a device
+- `PATCH /devices/{device_id}/status` - Update device active status
+- `POST /devices/{device_id}/heartbeat` - Update last_seen timestamp
+
+### Mailbox Events
+
+- `POST /mailbox/events` - Create a mailbox open/close event
+- `GET /mailbox/events` - List events for a device
+- `DELETE /mailbox/events/{event_id}` - Remove an event
+
+### Images
+
+- `POST /mailbox/images` - Upload an image to S3
+- `GET /mailbox/images` - List images for a device
+- `DELETE /mailbox/images/{image_id}` - Remove an image (deletes from S3 also)
+
+### Notifications
+
+- `POST /mailbox/notifications` - Send a notification
+- `GET /mailbox/notifications` - List notifications for a device
+- `DELETE /mailbox/notifications/{notification_id}` - Remove a notification
+
+## Running Locally
+
+1. Install dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Make sure your `.env` file is set up.
+
+3. Run the development server:
+
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+4. Access the API documentation at http://localhost:8000/docs
+
+## Docker Deployment
+
+Run the service using Docker Compose:
 
 ```bash
-docker compose down -v
-docker compose up --build
+docker-compose up -d
 ```
+
+This will start the service on port 9000.
+
+## AWS Lambda Deployment
+
+The backend is configured to run as an AWS Lambda function using Mangum adapter.
+
+1. Build the Docker image:
+
+   ```bash
+   docker build -t mailbox-api -f Dockerfile.lambda .
+   ```
+
+2. Deploy using CDK from the cdk/ directory.
+
+## Testing
+
+To test the database connection:
+
+```bash
+python test_db_connection.py
+```
+
+## API Documentation
+
+- Swagger UI: `/docs`
+- ReDoc: `/redoc`
