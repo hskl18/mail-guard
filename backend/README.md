@@ -1,138 +1,103 @@
 # Smart Mailbox Backend API
 
-This is the backend service for the Smart Mailbox Monitor system, built with FastAPI and deployed as either a local service or AWS Lambda function.
+This backend service exposes RESTful endpoints for managing devices, mailbox events, image uploads, and notifications for the Smart Mailbox Monitor system.
 
-https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws/docs#/default/create_device_devices_post
+## Technology Stack
 
-## Overview
+- Python 3.11
+- FastAPI & Pydantic
+- MySQL (with optional SSL via `SSL_CA`)
+- AWS Lambda with Mangum adapter
+- AWS CDK for deployment
+- Docker & Docker Compose
+- S3 for image storage
+- MailerSend for email notifications
 
-The backend provides a REST API for:
+## Prerequisites
 
-- Device management with Clerk authentication integration
-- Mailbox open/close event tracking
-- Image storage (with S3 integration)
-- Notification delivery (with MailerSend integration)
+- Python 3.11
+- pip
+- Docker (for containerized local or Lambda builds)
+- AWS CLI & AWS CDK (for AWS deployment)
 
-## Database Schema
+## Environment Configuration
 
-The MySQL database consists of the following tables:
+Create a `.env` file in `backend/`:
 
-- **devices** - Connected mailbox devices with clerk_id and email
-
-  - id, clerk_id, email, name, location, is_active, last_seen, created_at, updated_at
-
-- **mailbox_events** - Records of mailbox open/close activity
-
-  - id, device_id, event_type (open/close), occurred_at
-
-- **images** - Photos taken by mailbox devices
-
-  - id, device_id, image_url, captured_at
-
-- **notifications** - Messages sent to users about mailbox activity
-  - id, device_id, notification_type, sent_at
-
-## Environment Setup
-
-Create a `.env` file with the following variables:
-
-```
-# Database Configuration
-MYSQL_HOST=your_database_host
-MYSQL_PORT=your_database_port
-MYSQL_USER=your_database_user
-MYSQL_PASSWORD=your_database_password
-MYSQL_DATABASE=your_database_name
+```env
+# MySQL Configuration
+MYSQL_HOST=your_db_host
+MYSQL_PORT=3306
+MYSQL_USER=your_db_user
+MYSQL_PASSWORD=your_db_password
+MYSQL_DATABASE=mailbox_db
 MYSQL_SSL_CA=certs/rds-ca.pem
 
-# AWS Services
+# AWS & Storage
 S3_BUCKET=your_s3_bucket_name
 
-# MailerSend Configuration
-mail_api=your_mailersend_api_key
-mail_username=your@domain.com
-mail_from_name="Your Name"
+# MailerSend
+MAIL_API=your_mailersend_api_key
+MAIL_USERNAME=your@domain.com
+MAIL_FROM_NAME="Your Name"
+
+# Schema Initialization (true/false)
+INIT_SCHEMA=true
 ```
-
-## API Endpoints
-
-### Device Management
-
-- `POST /devices` - Register a new device
-- `GET /devices` - List devices for a clerk_id
-- `GET /devices/{device_id}` - Get a specific device
-- `PUT /devices/{device_id}` - Update device details
-- `DELETE /devices/{device_id}` - Remove a device
-- `PATCH /devices/{device_id}/status` - Update device active status
-- `POST /devices/{device_id}/heartbeat` - Update last_seen timestamp
-
-### Mailbox Events
-
-- `POST /mailbox/events` - Create a mailbox open/close event
-- `GET /mailbox/events` - List events for a device
-- `DELETE /mailbox/events/{event_id}` - Remove an event
-
-### Images
-
-- `POST /mailbox/images` - Upload an image to S3
-- `GET /mailbox/images` - List images for a device
-- `DELETE /mailbox/images/{image_id}` - Remove an image (deletes from S3 also)
-
-### Notifications
-
-- `POST /mailbox/notifications` - Send a notification
-- `GET /mailbox/notifications` - List notifications for a device
-- `DELETE /mailbox/notifications/{notification_id}` - Remove a notification
 
 ## Running Locally
 
 1. Install dependencies:
 
    ```bash
+   cd backend
    pip install -r requirements.txt
    ```
 
-2. Make sure your `.env` file is set up.
+2. Ensure `.env` is configured.
 
-3. Run the development server:
+3. Start the FastAPI server:
 
    ```bash
-   uvicorn main:app --reload
+   uvicorn main:app --reload --port 8000
    ```
 
-4. Access the API documentation at http://localhost:8000/docs
+4. Swagger UI available at `http://localhost:8000/docs`
 
-## Docker Deployment
+## Docker Compose
 
-Run the service using Docker Compose:
+Start services locally using Docker:
 
 ```bash
-docker-compose up -d
+cd backend
+docker-compose up --build -d
 ```
 
-This will start the service on port 9000.
+- API at `http://localhost:9000`
 
 ## AWS Lambda Deployment
 
-The backend is configured to run as an AWS Lambda function using Mangum adapter.
-
-1. Build the Docker image:
+1. Build Docker image for Lambda:
 
    ```bash
+   cd backend
    docker build -t mailbox-api -f Dockerfile.lambda .
    ```
 
-2. Deploy using CDK from the cdk/ directory.
+2. Deploy with CDK:
 
-## Testing
+   ```bash
+   cd cdk
+   source .venv/bin/activate  # create venv if needed
+   pip install -r requirements.txt
+   cdk bootstrap
+   cdk deploy
+   ```
 
-To test the database connection:
+## Further Documentation
 
-```bash
-python test_db_connection.py
-```
+- CDK Infrastructure: `backend/cdk/README.md`
 
-## API Documentation
+## License
 
-- Swagger UI: `/docs`
-- ReDoc: `/redoc`
+MIT License

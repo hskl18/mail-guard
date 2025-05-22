@@ -1,3 +1,69 @@
+# Smart Mailbox Frontend
+
+A web application for monitoring smart mailbox devices in real-time.
+
+## Technology Stack
+
+- Next.js 15 (App Router)
+- React 19 & TypeScript
+- Tailwind CSS & shadcn/ui
+- Clerk for authentication
+- Recharts, Lucide icons, React Hook Form, etc.
+
+## Prerequisites
+
+- Node.js 18.x or higher
+- pnpm or npm
+- Clerk account (obtain API keys)
+
+## Getting Started
+
+1. Install dependencies:
+
+   ```bash
+   cd frontend
+   pnpm install
+   # or npm install
+   ```
+
+2. Configure environment variables:
+
+   Create `.env.local` in `frontend/`:
+
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+   NEXT_PUBLIC_CLERK_SECRET_KEY=your_clerk_secret_key
+   ```
+
+3. Run development server:
+
+   ```bash
+   pnpm dev
+   # or npm run dev
+   ```
+
+4. Open in browser: `http://localhost:3000`
+
+## Build for Production
+
+```bash
+pnpm build
+pnpm start
+```
+
+Deploy with Vercel, Netlify, or any Node.js hosting.
+
+## Environment Variables
+
+- `NEXT_PUBLIC_API_BASE_URL`: Base URL for backend API
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key
+- `NEXT_PUBLIC_CLERK_SECRET_KEY`: Clerk secret key
+
+## License
+
+MIT License
+
 # Smart Mailbox Monitor
 
 A modern web application for monitoring your mailbox in real-time. This project provides a user interface for a smart device that detects mail delivery, mailbox access, and captures images for security.

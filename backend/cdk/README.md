@@ -1,87 +1,67 @@
-# Welcome to your CDK Python project!
+# AWS CDK Deployment - Smart Mailbox Backend
 
-This is a blank project for CDK development with Python.
+This CDK project deploys the Smart Mailbox Backend API as an AWS Lambda behind API Gateway.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Prerequisites
 
-This project is set up like a standard Python project. The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory. To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
+- AWS CLI configured with proper credentials
+- Node.js & Python 3.11
+- AWS CDK v2 installed (`npm install -g aws-cdk`)
 
-To manually create a virtualenv on MacOS and Linux:
+## Setup
 
-```
-$ python3 -m venv .venv
-```
+1. Navigate to the CDK directory:
 
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
+   ```bash
+   cd backend/cdk
+   ```
 
-```
-$ source .venv/bin/activate
-```
+2. Create and activate virtual environment:
 
-If you are a Windows platform, you would activate the virtualenv like this:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
 
-```
-% .venv\Scripts\activate.bat
-```
+3. Install Python dependencies:
 
-Once the virtualenv is activated, you can install the required dependencies.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```
-$ pip install -r requirements.txt
-```
+## CDK Commands
 
-At this point you can now synthesize the CloudFormation template for this code.
-
-```
-$ cdk synth
-```
-
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
-
-## Useful commands
-
-- `cdk ls` list all stacks in the app
-- `cdk synth` emits the synthesized CloudFormation template
-- `cdk deploy` deploy this stack to your default AWS account/region
-- `cdk diff` compare deployed stack with current state
-- `cdk docs` open CDK documentation
+- `cdk synth` # synthesizes CloudFormation template
+- `cdk deploy` # deploys stack
+- `cdk diff` # diff against deployed stack
+- `cdk destroy` # removes stack
 
 ## Project Structure
 
-```text
+```
 backend/cdk
-├── app.py                # CDK entry point (bin)
-├── stacks/               # All CloudFormation stacks live here
-│   ├── __init__.py
-│   └── mailbox_api_stack.py
-├── tests/                # CDK unit tests
-│   └── unit/
-├── requirements.txt      # Runtime dependencies for CDK app
-├── requirements-dev.txt  # Dev / test dependencies
-└── cdk.json              # CDK configuration
+├── app.py                # CDK application entrypoint
+├── cdk.json              # CDK configuration
+├── requirements.txt      # Python dependencies
+└── stacks/
+    └── mailbox_api_stack.py  # Defines Lambda & API Gateway stack
 ```
 
-You can add additional stacks inside `stacks/` (e.g. `network_stack.py`, `data_stack.py`). Simply import them from `app.py`.
-
-Run commands the same way as before:
+## Deployment
 
 ```bash
-# bootstrap (only once per account/region)
-cdk bootstrap
-
-# synthesize
-cdk synth
-
-# deploy
+cdk bootstrap   # once per AWS environment
 cdk deploy
 ```
 
-Enjoy!
+## Cleanup
+
+To remove all deployed resources:
+
+```bash
+cdk destroy
+```
+
+## License
+
+MIT License

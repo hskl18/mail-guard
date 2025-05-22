@@ -1,142 +1,65 @@
-# Smart Mailbox Monitor
+# Mail Guard (Smart Mailbox Monitor)
 
-A comprehensive smart mailbox monitoring system that helps users track their mailbox activity, receive notifications, and view mailbox images.
+A comprehensive smart mailbox monitoring system.
 
-## Project Structure
+## Repository Structure
 
 ```
 .
-├── backend/           # FastAPI backend service
-├── frontend/         # Frontend application
-├── IOT/              # IoT device code
-└── Server/           # Additional server components
+├── backend/            # FastAPI backend service
+│   ├── main.py         # API implementation
+│   ├── requirements.txt# Python dependencies
+│   ├── Dockerfile.*    # Docker images for local and Lambda
+│   ├── docker-compose.yml
+│   └── cdk/            # AWS CDK deployment for AWS
+├── frontend/           # Next.js frontend application
+│   ├── app/            # Next.js App Router pages
+│   ├── components/     # UI components & hooks
+│   └── package.json    # Node dependencies
+├── assets/             # Static assets (images, icons)
+└── README.md           # This file
 ```
 
-## Backend Service
+## Technology Stack
 
-The backend is built with FastAPI and provides a robust API for managing smart mailbox devices, events, and notifications.
+- Backend:
+  - Python 3.11, FastAPI, Pydantic
+  - MySQL with SSL via `mysql.connector`
+  - AWS Lambda (Mangum adapter) & API Gateway
+  - AWS CDK (Python) for infrastructure
+  - S3 for image storage; SNS & MailerSend for notifications
+- Frontend:
+  - Next.js 15 (App Router), React 19, TypeScript
+  - Tailwind CSS & shadcn/ui components
+  - Clerk for authentication & session management
+- Infrastructure:
+  - AWS CDK & CloudFormation
 
-### Features
+## Quick Start
 
-- Device Management
+Refer to each service directory for detailed instructions:
 
-  - Register and manage smart mailbox devices
-  - Track device status and firmware versions
-  - Monitor device locations
+- Backend: `backend/README.md`
+- Frontend: `frontend/README.md`
+- CDK Deployment: `backend/cdk/README.md`
 
-- Mailbox Events
+First, create a virtual environment and install dependencies:
 
-  - Track mailbox open/close events
-  - Historical event logging
-  - Real-time event processing
-
-- Image Management
-
-  - Store and retrieve mailbox images
-  - Image URL management
-  - Timestamp tracking
-
-- Notification System
-  - Real-time notifications
-  - Multiple notification types
-  - User-specific notification routing
-
-### API Endpoints
-
-- `POST /devices` - Register a new device
-- `GET /devices` - List user's devices
-- `PUT /devices/{device_id}` - Update device info
-- `POST /mailbox/events` - Record an open/close event
-- `GET /mailbox/events` - List events for a device
-- `POST /mailbox/images` - Save an image URL
-- `GET /mailbox/images` - List images for a device
-- `POST /mailbox/notifications` - Record a notification
-- `GET /mailbox/notifications` - List notifications for a user
-
-### Database Schema
-
-The system uses MySQL with the following tables:
-
-- `users` - User account information
-- `devices` - Smart mailbox device details
-- `mailbox_events` - Mailbox open/close events
-- `images` - Mailbox image records
-- `notifications` - System notifications
-
-## Setup and Installation
-
-### Prerequisites
-
-- Docker and Docker Compose
-- MySQL server
-- Python 3.8+
-
-### Environment Variables
-
-Create a `.env` file in the backend directory with the following variables:
-
-```env
-MYSQL_HOST=your_mysql_host
-MYSQL_PORT=3306
-MYSQL_USER=your_mysql_user
-MYSQL_PASSWORD=your_mysql_password
-MYSQL_DATABASE=mailbox_monitor
-MYSQL_SSL_CA=path_to_ssl_ca
 ```
+python3 -m venv .venv
+source .venv/bin/activate
 
-### Running the Backend
-
-1. Navigate to the backend directory:
-
-   ```bash
-   cd backend
-   ```
-
-2. Start the services using Docker Compose:
-
-   ```bash
-   docker-compose up -d
-   ```
-
-3. The API will be available at `http://localhost:8000`
-
-### API Documentation
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## Development
-
-### Running Tests
-
-```bash
-docker-compose run test
+pip install -r backend/requirements.txt -r backend/cdk/requirements.txt
 ```
-
-### Code Structure
-
-- `main.py` - Core API implementation
-- `requirements.txt` - Python dependencies
-- `Dockerfile` - Container configuration
-- `docker-compose.yml` - Service orchestration
-- `certs/` - SSL certificates
-- `tests/` - Test suite
-
-## Security
-
-- SSL/TLS encryption for database connections
-- Secure password storage
-- API authentication
-- Input validation using Pydantic models
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/xyz`)
 3. Commit your changes
 4. Push to the branch
-5. Create a Pull Request
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
