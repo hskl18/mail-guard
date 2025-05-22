@@ -26,6 +26,16 @@ yarn-error.log*
 
 # env files
 .env
+*.swp
+package-lock.json
+__pycache__
+.pytest_cache
+.venv
+*.egg-info
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
 
 # vercel
 .vercel
@@ -37,4 +47,8 @@ next-env.d.ts
 /.clerk/
 */etc/secrets/*
 
-/__pycache__
+__pycache__/
+path/
+path/to/venv/
+venv/
+.venv/

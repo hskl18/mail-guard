@@ -11,7 +11,7 @@ The backend provides a REST API for:
 - Device management with Clerk authentication integration
 - Mailbox open/close event tracking
 - Image storage (with S3 integration)
-- Notification delivery (with SES integration)
+- Notification delivery (with MailerSend integration)
 
 ## Database Schema
 
@@ -47,8 +47,11 @@ MYSQL_SSL_CA=certs/rds-ca.pem
 
 # AWS Services
 S3_BUCKET=your_s3_bucket_name
-SES_SOURCE_EMAIL=your_verified_email@example.com
-AWS_REGION=us-west-2
+
+# MailerSend Configuration
+mail_api=your_mailersend_api_key
+mail_username=your@domain.com
+mail_from_name="Your Name"
 ```
 
 ## API Endpoints
