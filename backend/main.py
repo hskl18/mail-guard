@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 import mysql.connector
 from mysql.connector import pooling
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import boto3
@@ -356,21 +356,6 @@ def create_device(p: DevicePayload):
         (p.clerk_id, p.email, p.name, p.location, p.is_active),
     )
 
-@app.post("/devices/batch", response_model=Dict[str, int])
-def create_devices_batch(p: DeviceBatchPayload):
-    """Create multiple devices in a single API call for more efficient frontend operations"""
-    created_count = 0
-    for device in p.devices:
-        try:
-            _insert(
-                "INSERT INTO devices(clerk_id,email,name,location,is_active) VALUES (%s,%s,%s,%s,%s)",
-                (device.clerk_id, device.email, device.name, device.location, device.is_active),
-            )
-            created_count += 1
-        except Exception as e:
-            logger.error(f"Error creating device: {e}")
-    
-    return {"created_count": created_count}
 
 @app.get("/devices", response_model=List[Dict[str, Any]])
 def list_devices(clerk_id: str):
@@ -410,13 +395,6 @@ def delete_device(device_id: int, clerk_id: str):
         except mysql.connector.Error as e:
             logger.error(f"Delete error: {e}")
             raise HTTPException(500, f"Database error: {e}")
-
-@app.patch("/devices/{device_id}/status", response_model=Dict[str, int])
-def update_device_status(device_id: int, p: DeviceStatusPayload):
-    return _insert(
-        "UPDATE devices SET is_active=%s,last_seen=NOW() WHERE id=%s AND clerk_id=%s",
-        (p.is_active, device_id, p.clerk_id),
-    )
 
 @app.post("/devices/{device_id}/heartbeat", response_model=Dict[str, int])
 def device_heartbeat(device_id: int, p: HeartbeatPayload):
@@ -520,46 +498,44 @@ async def upload_image(device_id: int, file: UploadFile = File(...)):
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
 
-@app.get("/mailbox/images", response_model=List[str])
+@app.get("/mailbox/images", response_class=StreamingResponse)
 async def list_images(device_id: int):
-    """List all images for a device by returning presigned S3 URLs"""
+    """Return the latest image for a device as raw binary"""
     try:
         global s3_client
         if s3_client is None:
             aws_region = os.getenv("AWS_REGION", "us-west-1")
-            logger.info(f"Initializing S3 client for listing with region: {aws_region}")
+            logger.info(f"Initializing S3 client with region: {aws_region}")
             s3_client = boto3.client("s3", region_name=aws_region)
-        bucket = os.getenv("S3_BUCKET")
-        if not bucket:
-            logger.error("S3_BUCKET environment variable not set for listing")
+        bucket_name = os.getenv("S3_BUCKET")
+        if not bucket_name:
+            logger.error("S3_BUCKET environment variable not set")
             raise HTTPException(status_code=500, detail="S3 bucket not configured")
-        prefix = f"{device_id}/"
-        resp = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix)
-        keys = [obj["Key"] for obj in resp.get("Contents", [])]
-        urls = []
-        for key in keys:
-            try:
-                url = s3_client.generate_presigned_url(
-                    "get_object",
-                    Params={"Bucket": bucket, "Key": key},
-                    ExpiresIn=3600,
-                )
-                urls.append(url)
-            except Exception as e:
-                logger.warning(f"Failed to generate presigned URL for {key}: {e}")
-        return urls
-    except Exception as e:
-        logger.error(f"Error listing images for device {device_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error listing images: {e}")
 
-@app.get("/mailbox/images/latest", response_model=str)
+        prefix = f"{device_id}/"
+        listing = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+        contents = listing.get("Contents", [])
+        if not contents:
+            raise HTTPException(status_code=404, detail="No images found for this device")
+
+        # Sort by LastModified descending and pick the most recent
+        contents.sort(key=lambda obj: obj.get("LastModified"), reverse=True)
+        key = contents[0]["Key"]
+        logger.info(f"Streaming image from S3 key: {key}")
+        s3_obj = s3_client.get_object(Bucket=bucket_name, Key=key)
+        stream = s3_obj["Body"]
+        content_type = s3_obj.get("ContentType", "application/octet-stream")
+        return StreamingResponse(stream, media_type=content_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error streaming image for device {device_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error streaming image: {e}")
+
+@app.get("/mailbox/images/latest", response_class=StreamingResponse)
 async def get_latest_image(device_id: int):
-    """Return the presigned URL for the latest image for a device"""
-    # Reuse the list_images endpoint to generate presigned URLs
-    urls = await list_images(device_id)
-    if not urls:
-        raise HTTPException(status_code=404, detail="No images found for this device")
-    return urls[0]
+    """Stream the latest image for a device as raw binary"""
+    return await list_images(device_id)
 
 @app.delete("/mailbox/images/{image_id}", response_model=Dict[str, int])
 def delete_image(image_id: int):
@@ -636,20 +612,6 @@ def delete_notification(notification_id: int):
         except mysql.connector.Error as e:
             logger.error(f"Delete error: {e}")
             raise HTTPException(500, f"Database error: {e}")
-
-@app.get("/devices/status", response_model=List[DeviceStatusResponse])
-def get_devices_status(clerk_id: str):
-    """Optimized endpoint to get just status information for all user devices"""
-    results = _select(
-        """
-        SELECT id, is_active, last_seen 
-        FROM devices 
-        WHERE clerk_id=%s 
-        ORDER BY last_seen DESC
-        """,
-        (clerk_id,),
-    )
-    return results
 
 @app.post("/devices/{device_id}/health", response_model=Dict[str, str])
 def update_device_health(device_id: int, p: DeviceHealthPayload):
