@@ -1,4 +1,4 @@
-# Mail Guard (Smart Mailbox Monitor)
+# Mail Guard (Smart Mailbox Monitor) IOT MVP
 
 A comprehensive smart mailbox monitoring system.
 
@@ -39,6 +39,10 @@ A comprehensive smart mailbox monitoring system.
   - Clerk for authentication & session management
 - Infrastructure:
   - AWS CDK & CloudFormation
+- Sensor:
+  - ESP32
+  - OV2640 camera module
+  - Reed switch sensor
 
 ## Quick Start
 

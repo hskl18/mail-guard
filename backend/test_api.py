@@ -49,7 +49,17 @@ def test_create_device():
         "email": "18hskl@gmail.com",
         "name": "Test Device",
         "location": "Test Lab",
-        "is_active": True
+        "is_active": True,
+        "mail_delivered_notify": True,
+        "mailbox_opened_notify": True,
+        "mail_removed_notify": True,
+        "battery_low_notify": True,
+        "push_notifications": True,
+        "email_notifications": False,
+        "check_interval": 15,
+        "battery_threshold": 20,
+        "capture_image_on_open": True,
+        "capture_image_on_delivery": True
     }
     resp = requests.post(f"{BASE}/devices", json=payload)
     if resp.status_code == 200 and resp.json().get("id"):
@@ -142,7 +152,23 @@ def test_update_device():
     if not device_id:
         fail("Skipping update device: no device_id")
         return
-    payload = {"clerk_id": "test_user", "email": "18hskl@gmail.com", "name": "Updated Device", "location": "New Loc", "is_active": True}
+    payload = {
+        "clerk_id": "test_user",
+        "email": "18hskl@gmail.com", 
+        "name": "Updated Device", 
+        "location": "New Loc", 
+        "is_active": True,
+        "mail_delivered_notify": True,
+        "mailbox_opened_notify": False,
+        "mail_removed_notify": True,
+        "battery_low_notify": True,
+        "push_notifications": True,
+        "email_notifications": True,
+        "check_interval": 30,
+        "battery_threshold": 15,
+        "capture_image_on_open": True,
+        "capture_image_on_delivery": False
+    }
     resp = requests.put(f"{BASE}/devices/{device_id}", json=payload)
     if resp.status_code == 200:
         ok("PUT /devices/{id}")
@@ -274,6 +300,51 @@ def test_get_dashboard():
         fail(f"GET /dashboard/test_user returned {resp.status_code}")
 
 
+def test_get_device_settings():
+    if not device_id:
+        fail("Skipping get device settings: no device_id")
+        return
+    resp = requests.get(f"{BASE}/devices/{device_id}/settings", params={"clerk_id": "test_user"})
+    if resp.status_code == 200 and isinstance(resp.json(), dict):
+        settings = resp.json()
+        # Check if settings has the expected keys
+        expected_keys = [
+            "mail_delivered_notify",
+            "mailbox_opened_notify",
+            "mail_removed_notify",
+            "battery_low_notify",
+            "push_notifications",
+            "email_notifications",
+            "check_interval",
+            "battery_threshold",
+            "capture_image_on_open",
+            "capture_image_on_delivery"
+        ]
+        if all(key in settings for key in expected_keys):
+            ok("GET /devices/{id}/settings")
+        else:
+            fail(f"GET /devices/{device_id}/settings missing expected keys: {[key for key in expected_keys if key not in settings]}")
+    else:
+        fail(f"GET /devices/{device_id}/settings returned {resp.status_code}")
+
+
+def test_update_device_settings():
+    if not device_id:
+        fail("Skipping update device settings: no device_id")
+        return
+    payload = {
+        "clerk_id": "test_user",
+        "mail_delivered_notify": False,
+        "mailbox_opened_notify": True,
+        "battery_threshold": 25
+    }
+    resp = requests.put(f"{BASE}/devices/{device_id}/settings", json=payload)
+    if resp.status_code == 200 and resp.json().get("status") == "updated":
+        ok("PUT /devices/{id}/settings")
+    else:
+        fail(f"PUT /devices/{device_id}/settings returned {resp.status_code}: {resp.text}")
+
+
 def test_cleanup():
     # delete image
     if image_id:
@@ -308,6 +379,8 @@ if __name__ == "__main__":
 
         test_get_device,
         test_update_device,
+        test_get_device_settings,
+        test_update_device_settings,
         test_patch_status,
         test_heartbeat,
         test_create_event,

@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { Suspense } from "react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import Dashboard from "@/components/dashboard"
-import Notifications from "@/components/notifications"
-import Settings from "@/components/settings"
-import { Loader2 } from "lucide-react"
-import UserNav from "@/components/user-nav"
+import { Suspense } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Dashboard from "@/components/dashboard";
+import Notifications from "@/components/notifications";
+import Settings from "@/components/settings";
+import { Loader2 } from "lucide-react";
+import UserNav from "@/components/user-nav";
 
 export default function AuthenticatedApp() {
   return (
@@ -14,8 +14,12 @@ export default function AuthenticatedApp() {
       <div className="mx-auto max-w-7xl">
         <header className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">Smart Mailbox Monitor</h1>
-            <p className="text-gray-500">Keep track of your mail in real-time</p>
+            <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
+              Smart Mailbox Monitor
+            </h1>
+            <p className="text-gray-500">
+              Keep track of your mail in real-time
+            </p>
           </div>
           <UserNav />
         </header>
@@ -47,7 +51,7 @@ export default function AuthenticatedApp() {
         </Tabs>
       </div>
     </main>
-  )
+  );
 }
 
 function LoadingState() {
@@ -55,5 +59,5 @@ function LoadingState() {
     <div className="flex justify-center items-center h-64">
       <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
     </div>
-  )
+  );
 }

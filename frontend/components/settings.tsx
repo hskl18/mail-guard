@@ -1,47 +1,299 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Bell, Smartphone, Wifi, Shield, Save, Mail } from "lucide-react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
+import {
+  Bell,
+  Smartphone,
+  Wifi,
+  Shield,
+  Save,
+  Mail,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 
 export default function Settings() {
-  // Mock settings state - in a real app, this would be fetched from an API
-  const [notificationSettings, setNotificationSettings] = useState({
-    mailDelivered: true,
-    mailboxOpened: true,
-    mailRemoved: true,
-    batteryLow: true,
-    pushNotifications: true,
-    emailNotifications: false,
-  })
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+  const { user } = useUser();
+  const [isLoading, setIsLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [devices, setDevices] = useState<any[]>([]);
+  const [currentDevice, setCurrentDevice] = useState<any>(null);
 
+  // Notification settings with defaults that will be overridden by API data
+  const [notificationSettings, setNotificationSettings] = useState({
+    mail_delivered_notify: true,
+    mailbox_opened_notify: true,
+    mail_removed_notify: true,
+    battery_low_notify: true,
+    push_notifications: true,
+    email_notifications: false,
+  });
+
+  // Device settings with defaults that will be overridden by API data
   const [deviceSettings, setDeviceSettings] = useState({
-    deviceName: "Home Mailbox",
-    checkInterval: "15",
-    batteryNotificationThreshold: "20",
-    captureImageOnOpen: true,
-    captureImageOnDelivery: true,
-  })
+    name: "",
+    location: "",
+    check_interval: "15",
+    battery_threshold: "20",
+    capture_image_on_open: true,
+    capture_image_on_delivery: true,
+  });
+
+  // Load devices and settings on component mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!user?.id) return;
+
+      setIsLoading(true);
+      setError("");
+
+      try {
+        // First fetch user's devices
+        const devicesUrl = `${API_BASE}/devices?clerk_id=${user.id}`;
+        console.log(`Fetching devices from: ${devicesUrl}`);
+
+        const devicesRes = await fetch(devicesUrl, {
+          method: "GET",
+          mode: "cors",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        if (!devicesRes.ok) {
+          throw new Error(`Failed to fetch devices: ${devicesRes.status}`);
+        }
+
+        const devicesData = await devicesRes.json();
+        console.log("Devices data:", devicesData);
+
+        const devicesList = Array.isArray(devicesData) ? devicesData : [];
+        setDevices(devicesList);
+
+        // If we have devices, fetch settings for the first one
+        if (devicesList.length > 0) {
+          const device = devicesList[0];
+          setCurrentDevice(device);
+
+          // Set basic device info
+          setDeviceSettings((prev) => ({
+            ...prev,
+            name: device.name || "",
+            location: device.location || "",
+          }));
+
+          // Fetch detailed settings
+          await loadDeviceSettings(device.id, user.id);
+        }
+      } catch (err: any) {
+        console.error("Failed to load settings:", err);
+        setError(`Error loading settings: ${err.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, [user, API_BASE]);
+
+  // Function to load device settings
+  const loadDeviceSettings = async (deviceId: number, clerkId: string) => {
+    try {
+      const settingsUrl = `${API_BASE}/devices/${deviceId}/settings?clerk_id=${clerkId}`;
+      console.log(`Fetching device settings from: ${settingsUrl}`);
+
+      const settingsRes = await fetch(settingsUrl, {
+        method: "GET",
+        mode: "cors",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!settingsRes.ok) {
+        throw new Error(`Failed to fetch settings: ${settingsRes.status}`);
+      }
+
+      const settingsData = await settingsRes.json();
+      console.log("Settings data:", settingsData);
+
+      // Update notification settings
+      setNotificationSettings({
+        mail_delivered_notify: settingsData.mail_delivered_notify ?? true,
+        mailbox_opened_notify: settingsData.mailbox_opened_notify ?? true,
+        mail_removed_notify: settingsData.mail_removed_notify ?? true,
+        battery_low_notify: settingsData.battery_low_notify ?? true,
+        push_notifications: settingsData.push_notifications ?? true,
+        email_notifications: settingsData.email_notifications ?? false,
+      });
+
+      // Update device settings
+      setDeviceSettings((prev) => ({
+        ...prev,
+        check_interval: String(settingsData.check_interval ?? 15),
+        battery_threshold: String(settingsData.battery_threshold ?? 20),
+        capture_image_on_open: settingsData.capture_image_on_open ?? true,
+        capture_image_on_delivery:
+          settingsData.capture_image_on_delivery ?? true,
+      }));
+    } catch (err: any) {
+      console.error("Failed to load device settings:", err);
+      // Don't set global error, just log
+    }
+  };
 
   const handleNotificationChange = (key: keyof typeof notificationSettings) => {
     setNotificationSettings({
       ...notificationSettings,
       [key]: !notificationSettings[key],
-    })
-  }
+    });
+  };
 
-  const handleDeviceSettingChange = (key: keyof typeof deviceSettings, value: string | boolean) => {
+  const handleDeviceSettingChange = (
+    key: keyof typeof deviceSettings,
+    value: string | boolean
+  ) => {
     setDeviceSettings({
       ...deviceSettings,
       [key]: value,
-    })
+    });
+  };
+
+  const saveSettings = async () => {
+    if (!currentDevice || !user?.id) return;
+
+    setSaving(true);
+
+    try {
+      // Save notification settings
+      const settingsPayload = {
+        clerk_id: user.id,
+        mail_delivered_notify: notificationSettings.mail_delivered_notify,
+        mailbox_opened_notify: notificationSettings.mailbox_opened_notify,
+        mail_removed_notify: notificationSettings.mail_removed_notify,
+        battery_low_notify: notificationSettings.battery_low_notify,
+        push_notifications: notificationSettings.push_notifications,
+        email_notifications: notificationSettings.email_notifications,
+        check_interval: parseInt(deviceSettings.check_interval, 10),
+        battery_threshold: parseInt(deviceSettings.battery_threshold, 10),
+        capture_image_on_open: deviceSettings.capture_image_on_open,
+        capture_image_on_delivery: deviceSettings.capture_image_on_delivery,
+      };
+
+      // Update device settings
+      const settingsUrl = `${API_BASE}/devices/${currentDevice.id}/settings`;
+      const settingsRes = await fetch(settingsUrl, {
+        method: "PUT",
+        mode: "cors",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(settingsPayload),
+      });
+
+      if (!settingsRes.ok) {
+        throw new Error(`Failed to save settings: ${settingsRes.status}`);
+      }
+
+      // If name or location changed, update device properties too
+      if (
+        deviceSettings.name !== currentDevice.name ||
+        deviceSettings.location !== currentDevice.location
+      ) {
+        const devicePayload = {
+          clerk_id: user.id,
+          email: currentDevice.email,
+          name: deviceSettings.name,
+          location: deviceSettings.location,
+          is_active: currentDevice.is_active,
+        };
+
+        const deviceUrl = `${API_BASE}/devices/${currentDevice.id}`;
+        const deviceRes = await fetch(deviceUrl, {
+          method: "PUT",
+          mode: "cors",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(devicePayload),
+        });
+
+        if (!deviceRes.ok) {
+          throw new Error(`Failed to update device: ${deviceRes.status}`);
+        }
+      }
+
+      toast.success("Settings saved successfully");
+    } catch (err: any) {
+      console.error("Failed to save settings:", err);
+      toast.error(`Error saving settings: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 bg-red-50 rounded-lg text-center">
+        <p className="text-red-700">{error}</p>
+        <Button
+          onClick={() => window.location.reload()}
+          className="mt-4"
+          variant="outline"
+        >
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  // If no devices, show a message
+  if (devices.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <p className="mb-4 text-gray-600">No devices connected yet.</p>
+        <Button onClick={() => (window.location.href = "/connect-device")}>
+          Connect Device
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -56,7 +308,9 @@ export default function Settings() {
         <Card>
           <CardHeader>
             <CardTitle>Notification Settings</CardTitle>
-            <CardDescription>Configure how and when you receive notifications</CardDescription>
+            <CardDescription>
+              Configure how and when you receive notifications
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
@@ -68,8 +322,10 @@ export default function Settings() {
                 </div>
                 <Switch
                   id="mail-delivered"
-                  checked={notificationSettings.mailDelivered}
-                  onCheckedChange={() => handleNotificationChange("mailDelivered")}
+                  checked={notificationSettings.mail_delivered_notify}
+                  onCheckedChange={() =>
+                    handleNotificationChange("mail_delivered_notify")
+                  }
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -79,8 +335,10 @@ export default function Settings() {
                 </div>
                 <Switch
                   id="mailbox-opened"
-                  checked={notificationSettings.mailboxOpened}
-                  onCheckedChange={() => handleNotificationChange("mailboxOpened")}
+                  checked={notificationSettings.mailbox_opened_notify}
+                  onCheckedChange={() =>
+                    handleNotificationChange("mailbox_opened_notify")
+                  }
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -90,19 +348,23 @@ export default function Settings() {
                 </div>
                 <Switch
                   id="mail-removed"
-                  checked={notificationSettings.mailRemoved}
-                  onCheckedChange={() => handleNotificationChange("mailRemoved")}
+                  checked={notificationSettings.mail_removed_notify}
+                  onCheckedChange={() =>
+                    handleNotificationChange("mail_removed_notify")
+                  }
                 />
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-red-500" />
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
                   <Label htmlFor="battery-low">Battery low</Label>
                 </div>
                 <Switch
                   id="battery-low"
-                  checked={notificationSettings.batteryLow}
-                  onCheckedChange={() => handleNotificationChange("batteryLow")}
+                  checked={notificationSettings.battery_low_notify}
+                  onCheckedChange={() =>
+                    handleNotificationChange("battery_low_notify")
+                  }
                 />
               </div>
             </div>
@@ -118,27 +380,37 @@ export default function Settings() {
                 </div>
                 <Switch
                   id="push-notifications"
-                  checked={notificationSettings.pushNotifications}
-                  onCheckedChange={() => handleNotificationChange("pushNotifications")}
+                  checked={notificationSettings.push_notifications}
+                  onCheckedChange={() =>
+                    handleNotificationChange("push_notifications")
+                  }
                 />
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  <Label htmlFor="email-notifications">Email notifications</Label>
+                  <Label htmlFor="email-notifications">
+                    Email notifications
+                  </Label>
                 </div>
                 <Switch
                   id="email-notifications"
-                  checked={notificationSettings.emailNotifications}
-                  onCheckedChange={() => handleNotificationChange("emailNotifications")}
+                  checked={notificationSettings.email_notifications}
+                  onCheckedChange={() =>
+                    handleNotificationChange("email_notifications")
+                  }
                 />
               </div>
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="ml-auto">
+            <Button
+              className="ml-auto"
+              onClick={saveSettings}
+              disabled={saving}
+            >
               <Save className="h-4 w-4 mr-2" />
-              Save Changes
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </CardFooter>
         </Card>
@@ -148,7 +420,9 @@ export default function Settings() {
         <Card>
           <CardHeader>
             <CardTitle>Device Settings</CardTitle>
-            <CardDescription>Configure your Smart Mailbox Monitor device</CardDescription>
+            <CardDescription>
+              Configure your Smart Mailbox Monitor device
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4">
@@ -156,16 +430,31 @@ export default function Settings() {
                 <Label htmlFor="device-name">Device Name</Label>
                 <Input
                   id="device-name"
-                  value={deviceSettings.deviceName}
-                  onChange={(e) => handleDeviceSettingChange("deviceName", e.target.value)}
+                  value={deviceSettings.name}
+                  onChange={(e) =>
+                    handleDeviceSettingChange("name", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  value={deviceSettings.location}
+                  onChange={(e) =>
+                    handleDeviceSettingChange("location", e.target.value)
+                  }
                 />
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="check-interval">Check Interval (minutes)</Label>
                 <Select
-                  value={deviceSettings.checkInterval}
-                  onValueChange={(value) => handleDeviceSettingChange("checkInterval", value)}
+                  value={deviceSettings.check_interval}
+                  onValueChange={(value) =>
+                    handleDeviceSettingChange("check_interval", value)
+                  }
                 >
                   <SelectTrigger id="check-interval">
                     <SelectValue placeholder="Select interval" />
@@ -178,15 +467,20 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-500">
-                  How often the device checks for mail. Lower values use more battery.
+                  How often the device checks for mail. Lower values use more
+                  battery.
                 </p>
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="battery-threshold">Battery Notification Threshold (%)</Label>
+                <Label htmlFor="battery-threshold">
+                  Battery Notification Threshold (%)
+                </Label>
                 <Select
-                  value={deviceSettings.batteryNotificationThreshold}
-                  onValueChange={(value) => handleDeviceSettingChange("batteryNotificationThreshold", value)}
+                  value={deviceSettings.battery_threshold}
+                  onValueChange={(value) =>
+                    handleDeviceSettingChange("battery_threshold", value)
+                  }
                 >
                   <SelectTrigger id="battery-threshold">
                     <SelectValue placeholder="Select threshold" />
@@ -207,24 +501,39 @@ export default function Settings() {
               <h3 className="text-sm font-medium">Camera Settings</h3>
               <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="capture-on-open">Capture image when mailbox is opened</Label>
-                  <p className="text-xs text-gray-500">Takes a photo whenever the mailbox is opened</p>
+                  <Label htmlFor="capture-on-open">
+                    Capture image when mailbox is opened
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    Takes a photo whenever the mailbox is opened
+                  </p>
                 </div>
                 <Switch
                   id="capture-on-open"
-                  checked={deviceSettings.captureImageOnOpen}
-                  onCheckedChange={(checked) => handleDeviceSettingChange("captureImageOnOpen", checked)}
+                  checked={deviceSettings.capture_image_on_open}
+                  onCheckedChange={(checked) =>
+                    handleDeviceSettingChange("capture_image_on_open", checked)
+                  }
                 />
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="capture-on-delivery">Capture image on mail delivery</Label>
-                  <p className="text-xs text-gray-500">Takes a photo when new mail is detected</p>
+                  <Label htmlFor="capture-on-delivery">
+                    Capture image on mail delivery
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    Takes a photo when new mail is detected
+                  </p>
                 </div>
                 <Switch
                   id="capture-on-delivery"
-                  checked={deviceSettings.captureImageOnDelivery}
-                  onCheckedChange={(checked) => handleDeviceSettingChange("captureImageOnDelivery", checked)}
+                  checked={deviceSettings.capture_image_on_delivery}
+                  onCheckedChange={(checked) =>
+                    handleDeviceSettingChange(
+                      "capture_image_on_delivery",
+                      checked
+                    )
+                  }
                 />
               </div>
             </div>
@@ -239,7 +548,11 @@ export default function Settings() {
                   <Wifi className="h-4 w-4 text-green-500" />
                   <span>Connected to "Home Network"</span>
                 </div>
-                <Button variant="outline" size="sm" className="w-full md:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full md:w-auto"
+                >
                   Change WiFi Network
                 </Button>
               </div>
@@ -261,7 +574,9 @@ export default function Settings() {
         <Card>
           <CardHeader>
             <CardTitle>Account Settings</CardTitle>
-            <CardDescription>Manage your account and security settings</CardDescription>
+            <CardDescription>
+              Manage your account and security settings
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4">
@@ -271,7 +586,11 @@ export default function Settings() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" defaultValue="john.doe@example.com" />
+                <Input
+                  id="email"
+                  type="email"
+                  defaultValue="john.doe@example.com"
+                />
               </div>
             </div>
 
@@ -303,7 +622,9 @@ export default function Settings() {
                     <Smartphone className="h-4 w-4 text-gray-500" />
                     <div>
                       <p className="text-sm font-medium">iPhone 13</p>
-                      <p className="text-xs text-gray-500">Last active: Today, 2:45 PM</p>
+                      <p className="text-xs text-gray-500">
+                        Last active: Today, 2:45 PM
+                      </p>
                     </div>
                   </div>
                   <Button variant="ghost" size="sm">
@@ -318,7 +639,8 @@ export default function Settings() {
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-red-600">Danger Zone</h3>
               <p className="text-xs text-gray-500">
-                Once you delete your account, there is no going back. Please be certain.
+                Once you delete your account, there is no going back. Please be
+                certain.
               </p>
               <Button variant="destructive" size="sm">
                 Delete Account
@@ -334,5 +656,5 @@ export default function Settings() {
         </Card>
       </TabsContent>
     </Tabs>
-  )
+  );
 }

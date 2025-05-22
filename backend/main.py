@@ -5,6 +5,7 @@ import mysql.connector
 from mysql.connector import pooling
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import boto3
@@ -124,6 +125,16 @@ def init_pool():
                     last_seen DATETIME,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    mail_delivered_notify BOOLEAN DEFAULT TRUE,
+                    mailbox_opened_notify BOOLEAN DEFAULT TRUE,
+                    mail_removed_notify BOOLEAN DEFAULT TRUE,
+                    battery_low_notify BOOLEAN DEFAULT TRUE,
+                    push_notifications BOOLEAN DEFAULT TRUE,
+                    email_notifications BOOLEAN DEFAULT FALSE,
+                    check_interval INT DEFAULT 15,
+                    battery_threshold INT DEFAULT 20,
+                    capture_image_on_open BOOLEAN DEFAULT TRUE,
+                    capture_image_on_delivery BOOLEAN DEFAULT TRUE,
                     UNIQUE KEY uq_devices_clerk_id (clerk_id)
                   ) ENGINE=InnoDB;
                 """,
@@ -287,6 +298,16 @@ class DevicePayload(BaseModel):
     name: str
     location: Optional[str] = None
     is_active: Optional[bool] = True
+    mail_delivered_notify: Optional[bool] = True
+    mailbox_opened_notify: Optional[bool] = True
+    mail_removed_notify: Optional[bool] = True
+    battery_low_notify: Optional[bool] = True
+    push_notifications: Optional[bool] = True
+    email_notifications: Optional[bool] = False
+    check_interval: Optional[int] = 15
+    battery_threshold: Optional[int] = 20
+    capture_image_on_open: Optional[bool] = True
+    capture_image_on_delivery: Optional[bool] = True
 
 class DeviceBatchPayload(BaseModel):
     devices: List[DevicePayload]
@@ -326,6 +347,19 @@ class DeviceStatusPayload(BaseModel):
 class HeartbeatPayload(BaseModel):
     clerk_id: str
 
+class DeviceSettingsPayload(BaseModel):
+    clerk_id: str
+    mail_delivered_notify: Optional[bool] = None
+    mailbox_opened_notify: Optional[bool] = None
+    mail_removed_notify: Optional[bool] = None
+    battery_low_notify: Optional[bool] = None
+    push_notifications: Optional[bool] = None
+    email_notifications: Optional[bool] = None
+    check_interval: Optional[int] = None
+    battery_threshold: Optional[int] = None
+    capture_image_on_open: Optional[bool] = None
+    capture_image_on_delivery: Optional[bool] = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize boto3 clients for reuse across requests
@@ -345,6 +379,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Smart Mailbox Monitor API", version="1.0.0", lifespan=lifespan)
 
+# Add CORS middleware to allow frontend to access API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def landing_page():
     return "<html><body><h1>Smart Mailbox Monitor API</h1><ul><li><a href='/docs'>Swagger UI</a></li><li><a href='/redoc'>ReDoc</a></li></ul></body></html>"
@@ -352,10 +395,43 @@ async def landing_page():
 @app.post("/devices")
 def create_device(p: DevicePayload):
     return _insert(
-        "INSERT INTO devices(clerk_id,email,name,location,is_active) VALUES (%s,%s,%s,%s,%s)",
-        (p.clerk_id, p.email, p.name, p.location, p.is_active),
+        """
+        INSERT INTO devices(
+            clerk_id,
+            email,
+            name,
+            location,
+            is_active,
+            mail_delivered_notify,
+            mailbox_opened_notify,
+            mail_removed_notify,
+            battery_low_notify,
+            push_notifications,
+            email_notifications,
+            check_interval,
+            battery_threshold,
+            capture_image_on_open,
+            capture_image_on_delivery
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        (
+            p.clerk_id, 
+            p.email, 
+            p.name, 
+            p.location, 
+            p.is_active,
+            p.mail_delivered_notify,
+            p.mailbox_opened_notify,
+            p.mail_removed_notify,
+            p.battery_low_notify,
+            p.push_notifications,
+            p.email_notifications,
+            p.check_interval,
+            p.battery_threshold,
+            p.capture_image_on_open,
+            p.capture_image_on_delivery
+        ),
     )
-
 
 @app.get("/devices", response_model=List[Dict[str, Any]])
 def list_devices(clerk_id: str):
@@ -377,8 +453,41 @@ def get_device(device_id: int, clerk_id: str):
 @app.put("/devices/{device_id}", response_model=Dict[str, int])
 def update_device(device_id: int, p: DevicePayload):
     return _insert(
-        "UPDATE devices SET name=%s,location=%s,is_active=%s,last_seen=NOW() WHERE id=%s AND clerk_id=%s",
-        (p.name, p.location, p.is_active, device_id, p.clerk_id),
+        """
+        UPDATE devices SET 
+            name=%s,
+            location=%s,
+            is_active=%s,
+            mail_delivered_notify=%s,
+            mailbox_opened_notify=%s,
+            mail_removed_notify=%s,
+            battery_low_notify=%s,
+            push_notifications=%s,
+            email_notifications=%s,
+            check_interval=%s,
+            battery_threshold=%s,
+            capture_image_on_open=%s,
+            capture_image_on_delivery=%s,
+            last_seen=NOW() 
+        WHERE id=%s AND clerk_id=%s
+        """,
+        (
+            p.name, 
+            p.location, 
+            p.is_active, 
+            p.mail_delivered_notify,
+            p.mailbox_opened_notify,
+            p.mail_removed_notify,
+            p.battery_low_notify,
+            p.push_notifications,
+            p.email_notifications,
+            p.check_interval,
+            p.battery_threshold,
+            p.capture_image_on_open,
+            p.capture_image_on_delivery,
+            device_id, 
+            p.clerk_id
+        ),
     )
 
 @app.delete("/devices/{device_id}", response_model=Dict[str, int])
@@ -395,6 +504,14 @@ def delete_device(device_id: int, clerk_id: str):
         except mysql.connector.Error as e:
             logger.error(f"Delete error: {e}")
             raise HTTPException(500, f"Database error: {e}")
+
+@app.patch("/devices/{device_id}/status", response_model=Dict[str, int])
+def update_device_status(device_id: int, p: DeviceStatusPayload):
+    """Update just the status of a device"""
+    return _insert(
+        "UPDATE devices SET is_active=%s WHERE id=%s AND clerk_id=%s",
+        (p.is_active, device_id, p.clerk_id),
+    )
 
 @app.post("/devices/{device_id}/heartbeat", response_model=Dict[str, int])
 def device_heartbeat(device_id: int, p: HeartbeatPayload):
@@ -768,6 +885,92 @@ def get_user_dashboard(clerk_id: str):
         "recent_images": recent_images,
         "notification_count": notification_count[0]["count"] if notification_count else 0
     }
+
+@app.get("/devices/{device_id}/settings", response_model=Dict[str, Any])
+def get_device_settings(device_id: int, clerk_id: str):
+    """Get notification and device settings for a specific device"""
+    results = _select(
+        """
+        SELECT 
+            mail_delivered_notify,
+            mailbox_opened_notify,
+            mail_removed_notify,
+            battery_low_notify,
+            push_notifications,
+            email_notifications,
+            check_interval,
+            battery_threshold,
+            capture_image_on_open,
+            capture_image_on_delivery
+        FROM devices 
+        WHERE id=%s AND clerk_id=%s
+        """,
+        (device_id, clerk_id),
+    )
+    if not results:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    return results[0]
+
+@app.put("/devices/{device_id}/settings", response_model=Dict[str, str])
+def update_device_settings(device_id: int, p: DeviceSettingsPayload):
+    """Update device settings without changing other device properties"""
+    # Build the update query dynamically based on what was provided
+    set_parts = []
+    params = []
+    
+    if p.mail_delivered_notify is not None:
+        set_parts.append("mail_delivered_notify=%s")
+        params.append(p.mail_delivered_notify)
+        
+    if p.mailbox_opened_notify is not None:
+        set_parts.append("mailbox_opened_notify=%s")
+        params.append(p.mailbox_opened_notify)
+        
+    if p.mail_removed_notify is not None:
+        set_parts.append("mail_removed_notify=%s")
+        params.append(p.mail_removed_notify)
+        
+    if p.battery_low_notify is not None:
+        set_parts.append("battery_low_notify=%s")
+        params.append(p.battery_low_notify)
+        
+    if p.push_notifications is not None:
+        set_parts.append("push_notifications=%s")
+        params.append(p.push_notifications)
+        
+    if p.email_notifications is not None:
+        set_parts.append("email_notifications=%s")
+        params.append(p.email_notifications)
+        
+    if p.check_interval is not None:
+        set_parts.append("check_interval=%s")
+        params.append(p.check_interval)
+        
+    if p.battery_threshold is not None:
+        set_parts.append("battery_threshold=%s")
+        params.append(p.battery_threshold)
+        
+    if p.capture_image_on_open is not None:
+        set_parts.append("capture_image_on_open=%s")
+        params.append(p.capture_image_on_open)
+        
+    if p.capture_image_on_delivery is not None:
+        set_parts.append("capture_image_on_delivery=%s")
+        params.append(p.capture_image_on_delivery)
+    
+    # If nothing to update, return early
+    if not set_parts:
+        return {"status": "no changes"}
+    
+    # Add the WHERE clause parameters
+    params.extend([device_id, p.clerk_id])
+    
+    # Build and execute the query
+    query = f"UPDATE devices SET {', '.join(set_parts)} WHERE id=%s AND clerk_id=%s"
+    _insert(query, tuple(params))
+    
+    return {"status": "updated"}
 
 handler = Mangum(app)
 
