@@ -277,6 +277,7 @@ export default function Notifications() {
 
   return (
     <div className="space-y-6">
+      {/* Notifications Card */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -295,7 +296,6 @@ export default function Notifications() {
                   <SelectItem value="mail_delivered">Mail delivered</SelectItem>
                   <SelectItem value="open">Mailbox opened</SelectItem>
                   <SelectItem value="close">Mailbox closed</SelectItem>
-                  <SelectItem value="battery_low">Battery alerts</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -425,8 +425,6 @@ function getNotificationMessage(
       return `${deviceName} was opened`;
     case "close":
       return `${deviceName} was closed`;
-    case "battery_low":
-      return `Battery level is low for ${deviceName}`;
     default:
       return `Event detected: ${type} (${deviceName})`;
   }
@@ -440,8 +438,6 @@ function getNotificationIcon(type: string) {
       return <MailOpen className="h-4 w-4 text-white" />;
     case "close":
       return <Mail className="h-4 w-4 text-white" />;
-    case "battery_low":
-      return <AlertTriangle className="h-4 w-4 text-white" />;
     default:
       return <Bell className="h-4 w-4 text-white" />;
   }
@@ -455,8 +451,6 @@ function getNotificationIconBackground(type: string) {
       return "bg-blue-500";
     case "close":
       return "bg-amber-500";
-    case "battery_low":
-      return "bg-red-500";
     default:
       return "bg-gray-500";
   }

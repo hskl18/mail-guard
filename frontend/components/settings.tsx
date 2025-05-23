@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import {
   Bell,
   Smartphone,
@@ -10,6 +10,8 @@ import {
   Save,
   Mail,
   AlertTriangle,
+  UserIcon,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import {
   Card,
@@ -37,6 +39,7 @@ import { toast } from "sonner";
 export default function Settings() {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
   const { user } = useUser();
+  const { openUserProfile } = useClerk();
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +51,6 @@ export default function Settings() {
     mail_delivered_notify: true,
     mailbox_opened_notify: true,
     mail_removed_notify: true,
-    battery_low_notify: true,
     push_notifications: true,
     email_notifications: false,
   });
@@ -58,7 +60,6 @@ export default function Settings() {
     name: "",
     location: "",
     check_interval: "15",
-    battery_threshold: "20",
     capture_image_on_open: true,
     capture_image_on_delivery: true,
   });
@@ -146,7 +147,6 @@ export default function Settings() {
         mail_delivered_notify: settingsData.mail_delivered_notify ?? true,
         mailbox_opened_notify: settingsData.mailbox_opened_notify ?? true,
         mail_removed_notify: settingsData.mail_removed_notify ?? true,
-        battery_low_notify: settingsData.battery_low_notify ?? true,
         push_notifications: settingsData.push_notifications ?? true,
         email_notifications: settingsData.email_notifications ?? false,
       });
@@ -155,7 +155,6 @@ export default function Settings() {
       setDeviceSettings((prev) => ({
         ...prev,
         check_interval: String(settingsData.check_interval ?? 15),
-        battery_threshold: String(settingsData.battery_threshold ?? 20),
         capture_image_on_open: settingsData.capture_image_on_open ?? true,
         capture_image_on_delivery:
           settingsData.capture_image_on_delivery ?? true,
@@ -195,11 +194,9 @@ export default function Settings() {
         mail_delivered_notify: notificationSettings.mail_delivered_notify,
         mailbox_opened_notify: notificationSettings.mailbox_opened_notify,
         mail_removed_notify: notificationSettings.mail_removed_notify,
-        battery_low_notify: notificationSettings.battery_low_notify,
         push_notifications: notificationSettings.push_notifications,
         email_notifications: notificationSettings.email_notifications,
         check_interval: parseInt(deviceSettings.check_interval, 10),
-        battery_threshold: parseInt(deviceSettings.battery_threshold, 10),
         capture_image_on_open: deviceSettings.capture_image_on_open,
         capture_image_on_delivery: deviceSettings.capture_image_on_delivery,
       };
@@ -354,19 +351,6 @@ export default function Settings() {
                   }
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <Label htmlFor="battery-low">Battery low</Label>
-                </div>
-                <Switch
-                  id="battery-low"
-                  checked={notificationSettings.battery_low_notify}
-                  onCheckedChange={() =>
-                    handleNotificationChange("battery_low_notify")
-                  }
-                />
-              </div>
             </div>
 
             <Separator />
@@ -467,31 +451,8 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-500">
-                  How often the device checks for mail. Lower values use more
-                  battery.
+                  How often the device checks for mail.
                 </p>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="battery-threshold">
-                  Battery Notification Threshold (%)
-                </Label>
-                <Select
-                  value={deviceSettings.battery_threshold}
-                  onValueChange={(value) =>
-                    handleDeviceSettingChange("battery_threshold", value)
-                  }
-                >
-                  <SelectTrigger id="battery-threshold">
-                    <SelectValue placeholder="Select threshold" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10%</SelectItem>
-                    <SelectItem value="15">15%</SelectItem>
-                    <SelectItem value="20">20%</SelectItem>
-                    <SelectItem value="25">25%</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -559,12 +520,13 @@ export default function Settings() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button variant="outline" className="mr-2">
-              Reset Device
-            </Button>
-            <Button className="ml-auto">
+            <Button
+              className="ml-auto"
+              onClick={saveSettings}
+              disabled={saving}
+            >
               <Save className="h-4 w-4 mr-2" />
-              Save Changes
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </CardFooter>
         </Card>
@@ -574,85 +536,67 @@ export default function Settings() {
         <Card>
           <CardHeader>
             <CardTitle>Account Settings</CardTitle>
-            <CardDescription>
-              Manage your account and security settings
-            </CardDescription>
+            <CardDescription>Manage your Mail Guard account</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="full-name">Full Name</Label>
-                <Input id="full-name" defaultValue="John Doe" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  defaultValue="john.doe@example.com"
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Security</h3>
-              <div className="grid gap-2">
-                <Button variant="outline" className="w-full md:w-auto">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Change Password
-                </Button>
-              </div>
-              <div className="grid gap-2">
-                <Button variant="outline" className="w-full md:w-auto">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Enable Two-Factor Authentication
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Linked Devices</h3>
-              <div className="rounded-md border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-medium">iPhone 13</p>
-                      <p className="text-xs text-gray-500">
-                        Last active: Today, 2:45 PM
-                      </p>
-                    </div>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                {user?.imageUrl ? (
+                  <img
+                    src={user.imageUrl}
+                    alt="Profile"
+                    className="h-12 w-12 rounded-full"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
+                    <UserIcon className="h-6 w-6 text-gray-500" />
                   </div>
-                  <Button variant="ghost" size="sm">
-                    Remove
-                  </Button>
+                )}
+                <div>
+                  <p className="font-medium">
+                    {user?.fullName || user?.username}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {user?.primaryEmailAddress?.emailAddress}
+                  </p>
                 </div>
               </div>
+              <Button
+                onClick={() => openUserProfile()}
+                className="flex items-center"
+              >
+                <SettingsIcon className="h-4 w-4 mr-2" />
+                Manage Account
+              </Button>
             </div>
 
-            <Separator />
+            <Separator className="my-6" />
 
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-red-600">Danger Zone</h3>
-              <p className="text-xs text-gray-500">
-                Once you delete your account, there is no going back. Please be
-                certain.
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium">Connected Accounts</h3>
+              <p className="text-sm text-gray-500">
+                Manage your account details, profile information, and security
+                settings through Clerk's secure user management portal.
               </p>
-              <Button variant="destructive" size="sm">
-                Delete Account
+              <div className="space-y-2">
+                <p className="text-sm">With Clerk, you can:</p>
+                <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
+                  <li>Update your personal information</li>
+                  <li>Change your password or set up passwordless login</li>
+                  <li>Enable two-factor authentication</li>
+                  <li>Manage connected social accounts</li>
+                  <li>View login history and active sessions</li>
+                </ul>
+              </div>
+              <Button
+                onClick={() => openUserProfile()}
+                variant="outline"
+                className="w-full mt-4"
+              >
+                Open Account Settings
               </Button>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button className="ml-auto">
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </Button>
-          </CardFooter>
         </Card>
       </TabsContent>
     </Tabs>

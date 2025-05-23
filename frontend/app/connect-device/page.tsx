@@ -88,7 +88,7 @@ export default function ConnectDevicePage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Device Name</Label>
+              <Label htmlFor="name">Device Serial Number</Label>
               <Input
                 id="name"
                 name="name"

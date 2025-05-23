@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Battery, Mail, MailOpen, Clock, AlertTriangle } from "lucide-react";
+import { Mail, MailOpen, Clock, AlertTriangle } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -200,10 +200,6 @@ export default function Dashboard() {
             <Button className="justify-start" variant="outline">
               <Mail className="mr-2 h-4 w-4" />
               Check for new mail
-            </Button>
-            <Button className="justify-start" variant="outline">
-              <Battery className="mr-2 h-4 w-4" />
-              Check battery status
             </Button>
             <Button className="justify-start" variant="outline">
               <AlertTriangle className="mr-2 h-4 w-4" />
