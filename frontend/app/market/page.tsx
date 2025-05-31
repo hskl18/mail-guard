@@ -447,7 +447,11 @@ export default function MarketPage() {
               </div>
               <div className="relative h-[300px] md:h-[400px] rounded-lg overflow-hidden bg-gray-800/20">
                 <div className="absolute inset-0 flex items-center justify-center text-white/20 text-center p-6">
-                  <p className="text-sm">Campus deployment visualization</p>
+                  <img
+                    alt="Delivery Hub"
+                    className="w-full max-w-lg rounded-xl shadow-xl object-cover object-center"
+                    src="case.png"
+                  />
                 </div>
               </div>
             </div>
