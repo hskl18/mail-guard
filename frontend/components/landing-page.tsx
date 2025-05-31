@@ -42,6 +42,12 @@ export default function LandingPage() {
           </Link>
           <Link
             className="text-sm font-medium hover:underline underline-offset-4"
+            href="/market"
+          >
+            Market
+          </Link>
+          <Link
+            className="text-sm font-medium hover:underline underline-offset-4"
             href="/sign-in"
           >
             Sign In
