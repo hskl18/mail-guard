@@ -1,7 +1,14 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Mail, MailOpen, Clock, AlertTriangle } from "lucide-react";
+import {
+  Mail,
+  MailOpen,
+  Clock,
+  AlertTriangle,
+  Users,
+  Building,
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -96,8 +103,8 @@ export default function Dashboard() {
             {
               id: 999,
               clerk_id: user.id,
-              name: "Demo Mailbox",
-              location: "Development Environment",
+              name: "Main Delivery Hub",
+              location: "Building A Lobby",
               is_active: true,
               last_seen: new Date().toISOString(),
             },
@@ -152,9 +159,9 @@ export default function Dashboard() {
   if (!currentDevice) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <p className="mb-4 text-gray-600">No devices connected yet.</p>
+        <p className="mb-4 text-gray-600">No delivery hubs connected yet.</p>
         <Link href="/connect-device">
-          <Button>Connect Device</Button>
+          <Button>Connect Delivery Hub</Button>
         </Link>
       </div>
     );
@@ -163,14 +170,14 @@ export default function Dashboard() {
     <div>
       <div className="flex justify-end mb-4">
         <Link href="/connect-device">
-          <Button>Connect Device</Button>
+          <Button>Connect Delivery Hub</Button>
         </Link>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Status Card */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Device Status</CardTitle>
+            <CardTitle>Delivery Hub Status</CardTitle>
             <CardDescription>Info for {currentDevice.name}</CardDescription>
           </CardHeader>
           <CardContent>
@@ -199,7 +206,7 @@ export default function Dashboard() {
           <CardContent className="flex flex-col gap-2">
             <Button className="justify-start" variant="outline">
               <Mail className="mr-2 h-4 w-4" />
-              Check for new mail
+              Check delivery status
             </Button>
             <Button className="justify-start" variant="outline">
               <AlertTriangle className="mr-2 h-4 w-4" />
@@ -212,7 +219,9 @@ export default function Dashboard() {
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest events from your mailbox</CardDescription>
+            <CardDescription>
+              Latest events from your delivery hub
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -249,10 +258,15 @@ export default function Dashboard() {
                     )}
                   </div>
                   {index < recentEvents.length - 1 && (
-                    <Separator className="my-4" />
+                    <Separator className="my-2" />
                   )}
                 </div>
               ))}
+              {recentEvents.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No recent activity recorded
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

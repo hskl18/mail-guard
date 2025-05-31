@@ -30,6 +30,18 @@ export default function LandingPage() {
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link
             className="text-sm font-medium hover:underline underline-offset-4"
+            href="/"
+          >
+            Home
+          </Link>
+          <Link
+            className="text-sm font-medium hover:underline underline-offset-4"
+            href="/about"
+          >
+            About
+          </Link>
+          <Link
+            className="text-sm font-medium hover:underline underline-offset-4"
             href="/sign-in"
           >
             Sign In
@@ -64,7 +76,7 @@ export default function LandingPage() {
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>
-                  <Link href="#features">
+                  <Link href="/about">
                     <Button
                       variant="outline"
                       size="lg"
@@ -79,7 +91,7 @@ export default function LandingPage() {
                 <img
                   alt="Delivery Hub"
                   className="w-full max-w-lg rounded-xl shadow-xl object-cover object-center"
-                  src="mailbox.png"
+                  src="case.png"
                 />
               </div>
             </div>
@@ -99,28 +111,30 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white">
+              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
                 <School className="h-12 w-12 text-primary" />
                 <h3 className="text-xl font-bold">College Campuses</h3>
                 <p className="text-center text-gray-500">
                   Secure mail delivery for student dorms and university housing
                 </p>
               </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white">
+              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
                 <Building className="h-12 w-12 text-primary" />
                 <h3 className="text-xl font-bold">Apartment Complexes</h3>
                 <p className="text-center text-gray-500">
                   Monitor shared mailboxes in multi-tenant apartment buildings
                 </p>
               </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white">
+              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
                 <Home className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold">HOA & Gated Communities</h3>
+                <h3 className="text-xl font-bold text-center">
+                  HOA & Gated Communities
+                </h3>
                 <p className="text-center text-gray-500">
                   Secure monitoring for community mail kiosks and package areas
                 </p>
               </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white">
+              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
                 <Briefcase className="h-12 w-12 text-primary" />
                 <h3 className="text-xl font-bold">Office Buildings</h3>
                 <p className="text-center text-gray-500">
@@ -290,88 +304,6 @@ export default function LandingPage() {
                       Enhanced security oversight with timestamped access
                       records and visual verification.
                     </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="testimonials" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                  What Our Customers Say
-                </h2>
-                <p className="mx-auto text-gray-500 md:text-xl">
-                  Join organizations that trust Mail Guard Delivery Hub
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              <div className="flex flex-col space-y-4 rounded-lg border p-6 shadow-sm bg-white">
-                <div className="flex items-center space-x-1">
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                </div>
-                <p className="text-gray-500">
-                  "Mail Guard transformed our campus mail center. Students love
-                  the notifications, and our staff spends less time managing
-                  packages."
-                </p>
-                <div className="flex items-center space-x-2">
-                  <div className="h-10 w-10 rounded-full bg-gray-300"></div>
-                  <div>
-                    <p className="font-medium">Robert Chen</p>
-                    <p className="text-sm text-gray-500">
-                      Campus Housing Director
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col space-y-4 rounded-lg border p-6 shadow-sm bg-white">
-                <div className="flex items-center space-x-1">
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                </div>
-                <p className="text-gray-500">
-                  "The retrofit installation was seamless. Our 200-unit complex
-                  now has a modern package solution without any construction
-                  disruption."
-                </p>
-                <div className="flex items-center space-x-2">
-                  <div className="h-10 w-10 rounded-full bg-gray-300"></div>
-                  <div>
-                    <p className="font-medium">Lisa Rodriguez</p>
-                    <p className="text-sm text-gray-500">Property Manager</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col space-y-4 rounded-lg border p-6 shadow-sm bg-white">
-                <div className="flex items-center space-x-1">
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                  <Star className="h-5 w-5 fill-current text-yellow-500" />
-                </div>
-                <p className="text-gray-500">
-                  "Our HOA mail kiosk security issues disappeared overnight. The
-                  photo evidence feature has been invaluable for resolving
-                  delivery disputes."
-                </p>
-                <div className="flex items-center space-x-2">
-                  <div className="h-10 w-10 rounded-full bg-gray-300"></div>
-                  <div>
-                    <p className="font-medium">Marcus Johnson</p>
-                    <p className="text-sm text-gray-500">HOA President</p>
                   </div>
                 </div>
               </div>

@@ -15,10 +15,10 @@ export default function AuthenticatedApp() {
         <header className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Smart Mailbox Monitor
+              Mail Guard Delivery Hub
             </h1>
             <p className="text-gray-500">
-              Keep track of your mail in real-time
+              Secure monitoring for shared mail areas
             </p>
           </div>
           <UserNav />

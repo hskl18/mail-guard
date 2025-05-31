@@ -82,17 +82,19 @@ export default function ConnectDevicePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Connect New Device</CardTitle>
-          <CardDescription>Register your smart mailbox device</CardDescription>
+          <CardTitle>Connect Delivery Hub</CardTitle>
+          <CardDescription>
+            Register your mail area monitoring system
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Device Serial Number</Label>
+              <Label htmlFor="name">Hub ID / Serial Number</Label>
               <Input
                 id="name"
                 name="name"
-                placeholder="My Mailbox"
+                placeholder="Main Delivery Hub"
                 value={formData.name}
                 onChange={handleChange}
                 required
@@ -100,11 +102,11 @@ export default function ConnectDevicePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location">Location (optional)</Label>
+              <Label htmlFor="location">Location</Label>
               <Input
                 id="location"
                 name="location"
-                placeholder="Front Yard"
+                placeholder="Building A Lobby"
                 value={formData.location}
                 onChange={handleChange}
               />
@@ -115,7 +117,7 @@ export default function ConnectDevicePage() {
               className="w-full"
               disabled={isSubmitting || !formData.name}
             >
-              {isSubmitting ? "Connecting..." : "Connect Device"}
+              {isSubmitting ? "Connecting..." : "Connect Hub"}
             </Button>
           </form>
         </CardContent>
