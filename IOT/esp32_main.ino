@@ -2,13 +2,19 @@
 #include <HardwareSerial.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
  
-const int DEVICE_ID = 1; // Update this with your actual device ID from the database
+// Device identification
+const char* SERIES_ID = "ESP32_001"; // Update this with your device's unique serial ID
 const char* apiUrl = "https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws"; 
-const char* CLERK_ID = "esp32_device"; // Update with your Clerk ID from the dashboard
+
+// These will be populated after device registration/authentication
+int deviceId = -1;
+String clerkId = "";
+bool isRegistered = false;
 
 // Legacy variables - can be removed if not needed elsewhere
 const char* serverIpAddress = SERVER_IP; 
@@ -23,6 +29,63 @@ unsigned long lastReedCheckTime = 0;
 const unsigned long reedCheckInterval = 2000;
 unsigned long lastHttpNotificationTime = 0;
 const unsigned long httpNotificationCooldown = 5000; 
+
+// Function to get clerk_id and device_id from the backend using SERIES_ID
+bool getDeviceCredentials() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected. Cannot get device credentials.");
+    return false;
+  }
+
+  HTTPClient http;
+  
+  // Call the endpoint that gets device info from Series ID
+  String url = String(apiUrl) + "/device/lookup?serial_id=" + String(SERIES_ID);
+  Serial.print("Getting device credentials from: ");
+  Serial.println(url);
+  
+  http.begin(url);
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode == 200) {
+    String response = http.getString();
+    Serial.println("Credentials received:");
+    Serial.println(response);
+    
+    // Parse JSON response
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, response);
+    
+    if (!error) {
+      if (doc.containsKey("device_id") && doc.containsKey("clerk_id")) {
+        deviceId = doc["device_id"];
+        clerkId = doc["clerk_id"].as<String>();
+        
+        Serial.print("Device ID: ");
+        Serial.println(deviceId);
+        Serial.print("Clerk ID: ");
+        Serial.println(clerkId);
+        
+        isRegistered = true;
+        return true;
+      } else {
+        Serial.println("Missing device_id or clerk_id in response");
+      }
+    } else {
+      Serial.print("JSON parsing error: ");
+      Serial.println(error.c_str());
+    }
+  } else {
+    Serial.print("Error getting credentials: ");
+    Serial.println(httpResponseCode);
+    if (httpResponseCode == 404) {
+      Serial.println("Device not registered in the system");
+    }
+  }
+  
+  http.end();
+  return false;
+}
 
 // Function to read battery level (simulate or implement based on your hardware)
 int getBatteryLevel() {
@@ -45,6 +108,11 @@ int getBatteryLevel() {
 
 // Function to report device health including battery level
 void reportDeviceHealth() {
+  if (!isRegistered) {
+    Serial.println("Device not registered. Cannot send health report.");
+    return;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected. Cannot send health report.");
     return;
@@ -52,7 +120,7 @@ void reportDeviceHealth() {
 
   HTTPClient http;
   
-  String url = String(apiUrl) + "/devices/" + String(DEVICE_ID) + "/health";
+  String url = String(apiUrl) + "/devices/" + String(deviceId) + "/health";
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   
@@ -61,7 +129,7 @@ void reportDeviceHealth() {
   
   // Create JSON payload with battery level and other device info
   String jsonPayload = "{";
-  jsonPayload += "\"clerk_id\":\"" + String(CLERK_ID) + "\",";
+  jsonPayload += "\"clerk_id\":\"" + clerkId + "\",";
   jsonPayload += "\"battery_level\":" + String(batteryLevel) + ",";
   jsonPayload += "\"signal_strength\":" + String(WiFi.RSSI()) + ",";
   jsonPayload += "\"firmware_version\":\"1.0.0\"";
@@ -101,6 +169,11 @@ void connectToWiFi() {
 }
 
 void sendOpenNotificationToServer() {
+  if (!isRegistered) {
+    Serial.println("Device not registered. Cannot send notification.");
+    return;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected. Cannot send notification.");
     connectToWiFi(); 
@@ -115,7 +188,7 @@ void sendOpenNotificationToServer() {
 
   HTTPClient http;
 
-  String url = String(apiUrl) + "/iot/report?d=" + String(DEVICE_ID) + "&e=o";
+  String url = String(apiUrl) + "/iot/report?d=" + String(deviceId) + "&e=o";
   Serial.print("Sending mailbox open notification to: ");
   Serial.println(url);
   
@@ -139,6 +212,11 @@ void sendOpenNotificationToServer() {
 }
 
 void sendCloseNotificationToServer() {
+  if (!isRegistered) {
+    Serial.println("Device not registered. Cannot send close notification.");
+    return;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected. Cannot send close notification.");
     return;
@@ -146,7 +224,7 @@ void sendCloseNotificationToServer() {
 
   HTTPClient http;
 
-  String url = String(apiUrl) + "/iot/report?d=" + String(DEVICE_ID) + "&e=c";
+  String url = String(apiUrl) + "/iot/report?d=" + String(deviceId) + "&e=c";
   Serial.print("Sending mailbox close notification to: ");
   Serial.println(url);
   
@@ -168,6 +246,11 @@ void sendCloseNotificationToServer() {
 
 // Function to send periodic heartbeat to the server
 void sendHeartbeat() {
+  if (!isRegistered) {
+    Serial.println("Device not registered. Cannot send heartbeat.");
+    return;
+  }
+
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected. Cannot send heartbeat.");
     return;
@@ -176,11 +259,11 @@ void sendHeartbeat() {
   HTTPClient http;
   
   // Using POST for heartbeat as specified in the API
-  String url = String(apiUrl) + "/devices/" + String(DEVICE_ID) + "/heartbeat";
+  String url = String(apiUrl) + "/devices/" + String(deviceId) + "/heartbeat";
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   
-  String jsonPayload = "{\"clerk_id\":\"" + String(CLERK_ID) + "\"}";
+  String jsonPayload = "{\"clerk_id\":\"" + clerkId + "\"}";
   
   int httpResponseCode = http.POST(jsonPayload);
   
@@ -192,61 +275,6 @@ void sendHeartbeat() {
     Serial.println(httpResponseCode);
   }
   http.end();
-}
-
-void setup() {
-  Serial.begin(115200);
-  while (!Serial) {
-    delay(10);
-  }
-  Serial.println("Main ESP32 Reed Switch Controller Starting...");
-
-  pinMode(REED_SW_PIN, INPUT_PULLUP);
-  
-  connectToWiFi();
-
-  Serial.print("API URL configured to: ");
-  Serial.println(apiUrl);
-  Serial.print("Device ID configured to: ");
-  Serial.println(DEVICE_ID);
-
-  CamSerial.begin(115200, SERIAL_8N1, 16, 17); 
-  Serial.println("Serial2 for CAM communication initialized.");
-
-  int rawInitialState = digitalRead(REED_SW_PIN);
-  if (rawInitialState == HIGH) { 
-    previousUserReedState = 0; 
-  } else { 
-    previousUserReedState = 1; 
-  }
-  Serial.print("Initial Reed State (0=open, 1=closed): ");
-  Serial.println(previousUserReedState);
-}
-
-void loop() {
-  if (millis() - lastReedCheckTime >= reedCheckInterval) {
-    lastReedCheckTime = millis();
-    checkReedSwitchAndTriggerCam();
-  }
-  
-  // Send heartbeat every 5 minutes
-  static unsigned long lastHeartbeatTime = 0;
-  if (millis() - lastHeartbeatTime >= 300000) { // 5 minutes = 300,000 ms
-    lastHeartbeatTime = millis();
-    sendHeartbeat();
-  }
-  
-  // Send health report every hour
-  static unsigned long lastHealthReportTime = 0;
-  if (millis() - lastHealthReportTime >= 3600000) { // 1 hour = 3,600,000 ms
-    lastHealthReportTime = millis();
-    reportDeviceHealth();
-  }
-  
-  if (WiFi.status() != WL_CONNECTED && millis() % 30000 == 0) { 
-      Serial.println("WiFi disconnected. Attempting to reconnect...");
-      connectToWiFi();
-  }
 }
 
 void checkReedSwitchAndTriggerCam() {
@@ -276,4 +304,74 @@ void checkReedSwitchAndTriggerCam() {
     }
   }
   previousUserReedState = currentUserReedState;
+}
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial) {
+    delay(10);
+  }
+  Serial.println("Main ESP32 Reed Switch Controller Starting...");
+
+  pinMode(REED_SW_PIN, INPUT_PULLUP);
+  
+  connectToWiFi();
+
+  Serial.print("API URL configured to: ");
+  Serial.println(apiUrl);
+  Serial.print("Series ID configured to: ");
+  Serial.println(SERIES_ID);
+
+  // Get device credentials from backend
+  if (getDeviceCredentials()) {
+    Serial.println("Device registered successfully!");
+  } else {
+    Serial.println("Device registration failed. Will retry later.");
+  }
+
+  CamSerial.begin(115200, SERIAL_8N1, 16, 17); 
+  Serial.println("Serial2 for CAM communication initialized.");
+
+  int rawInitialState = digitalRead(REED_SW_PIN);
+  if (rawInitialState == HIGH) { 
+    previousUserReedState = 0; 
+  } else { 
+    previousUserReedState = 1; 
+  }
+  Serial.print("Initial Reed State (0=open, 1=closed): ");
+  Serial.println(previousUserReedState);
+}
+
+void loop() {
+  // Try to register if not registered yet
+  if (!isRegistered && WiFi.status() == WL_CONNECTED && millis() % 60000 == 0) {
+    Serial.println("Attempting to register device...");
+    getDeviceCredentials();
+  }
+
+  if (isRegistered) {
+    if (millis() - lastReedCheckTime >= reedCheckInterval) {
+      lastReedCheckTime = millis();
+      checkReedSwitchAndTriggerCam();
+    }
+    
+    // Send heartbeat every 5 minutes
+    static unsigned long lastHeartbeatTime = 0;
+    if (millis() - lastHeartbeatTime >= 300000) { // 5 minutes = 300,000 ms
+      lastHeartbeatTime = millis();
+      sendHeartbeat();
+    }
+    
+    // Send health report every hour
+    static unsigned long lastHealthReportTime = 0;
+    if (millis() - lastHealthReportTime >= 3600000) { // 1 hour = 3,600,000 ms
+      lastHealthReportTime = millis();
+      reportDeviceHealth();
+    }
+  }
+  
+  if (WiFi.status() != WL_CONNECTED && millis() % 30000 == 0) { 
+    Serial.println("WiFi disconnected. Attempting to reconnect...");
+    connectToWiFi();
+  }
 }

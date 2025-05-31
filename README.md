@@ -47,32 +47,37 @@ Mail Guard is designed to add security to your mailbox and prevent mail theft. T
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
-   pip install -r backend/requirements.txt
+   pip install -r backend/requirements.txt -r backend/cdk/requirements.txt
 
-   # Configure environment variables - create .env file in backend/
-   # See backend/README.md for required variables
-
-   # Start the backend
-   cd backend
-   uvicorn main:app --reload --port 8000
    ```
+
+# Configure environment variables - create .env file in backend/
+
+# See backend/README.md for required variables
+
+# Start the backend
+
+cd backend
+uvicorn main:app --reload --port 8000
+
+````
 
 3. Set up frontend:
 
-   ```bash
-   cd frontend
-   npm install
-   # or
-   pnpm install
+```bash
+cd frontend
+npm install
+# or
+pnpm install
 
-   # Configure environment variables - create .env.local
-   # See frontend/README.md for required variables
+# Configure environment variables - create .env.local
+# See frontend/README.md for required variables
 
-   # Start the frontend
-   npm run dev
-   # or
-   pnpm dev
-   ```
+# Start the frontend
+npm run dev
+# or
+pnpm dev
+````
 
 4. Open in browser:
    - Frontend: http://localhost:3000

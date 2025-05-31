@@ -972,6 +972,30 @@ def update_device_settings(device_id: int, p: DeviceSettingsPayload):
     
     return {"status": "updated"}
 
+@app.get("/device/lookup", response_model=Dict[str, Any])
+def lookup_device_by_serial(serial_id: str):
+    """Lookup device by Series ID and return device_id and clerk_id"""
+    try:
+        # Search for the device with this serial ID in the devices table
+        # Assuming serial_id is stored in the 'name' field for now
+        # You might want to add a dedicated serial_id column to the devices table
+        results = _select(
+            "SELECT id, clerk_id FROM devices WHERE name LIKE %s",
+            (f"%{serial_id}%",),
+        )
+        
+        if not results:
+            raise HTTPException(status_code=404, detail="Device not found")
+        
+        # Return the first matching device
+        return {
+            "device_id": results[0]["id"],
+            "clerk_id": results[0]["clerk_id"]
+        }
+    except Exception as e:
+        logger.error(f"Error looking up device by serial ID: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
 handler = Mangum(app)
 
 def process_notification(event, context):
