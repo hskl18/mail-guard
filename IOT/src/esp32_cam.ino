@@ -6,12 +6,69 @@
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
  
+// Use the same API URL as in the main ESP32 code
+const char* apiUrl = "https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws";
+
+// Device identification - this should match the one in main ESP32
+const char* SERIES_ID = "ESP32_001";
+int deviceId = -1; // Will be populated after device registration
+
+// Legacy variables kept for backward compatibility
 const char* serverIpAddress = SERVER_IP; 
 const int serverPort = SERVER_PORT;
 String imageUploadUrl; 
 
 unsigned long lastTriggerTime = 0;
 const unsigned long triggerCooldown = 5000;
+
+// Function to get device ID from the backend using SERIES_ID
+bool getDeviceId() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected. Cannot get device ID.");
+    return false;
+  }
+
+  HTTPClient http;
+  
+  // Call the endpoint that gets device info from Series ID
+  String url = String(apiUrl) + "/device/lookup?serial_id=" + String(SERIES_ID);
+  Serial.print("Getting device ID from: ");
+  Serial.println(url);
+  
+  http.begin(url);
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode == 200) {
+    String response = http.getString();
+    Serial.println("Response received:");
+    Serial.println(response);
+    
+    // Basic parsing for device_id (simplified compared to main ESP32)
+    int startIdx = response.indexOf("\"device_id\":");
+    if (startIdx > 0) {
+      startIdx += 11; // Length of "device_id":
+      int endIdx = response.indexOf(",", startIdx);
+      if (endIdx < 0) endIdx = response.indexOf("}", startIdx);
+      
+      if (endIdx > startIdx) {
+        String deviceIdStr = response.substring(startIdx, endIdx);
+        deviceIdStr.trim();
+        deviceId = deviceIdStr.toInt();
+        
+        Serial.print("Device ID: ");
+        Serial.println(deviceId);
+        return true;
+      }
+    }
+    Serial.println("Failed to parse device_id from response");
+  } else {
+    Serial.print("Error getting device ID: ");
+    Serial.println(httpResponseCode);
+  }
+  
+  http.end();
+  return false;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -26,8 +83,17 @@ void setup() {
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
-  imageUploadUrl = "http://" + String(serverIpAddress) + ":" + String(serverPort) + "/upload";
-  Serial.print("Server Image Upload URL configured to: ");
+  // Try to get device ID
+  if (!getDeviceId()) {
+    Serial.println("Failed to get device ID. Will use legacy upload URL.");
+    // Fall back to legacy URL format if device ID cannot be obtained
+    imageUploadUrl = "http://" + String(serverIpAddress) + ":" + String(serverPort) + "/upload";
+  } else {
+    // Use the correct API endpoint without query parameters
+    imageUploadUrl = String(apiUrl) + "/mailbox/images";
+  }
+  
+  Serial.print("Image Upload URL configured to: ");
   Serial.println(imageUploadUrl);
 
   camera_config_t config;
@@ -102,12 +168,40 @@ void captureAndSendPhotoToServer() {
 
   Serial.print("Sending image to: ");
   Serial.println(imageUploadUrl);
-  http.begin(client, imageUploadUrl); 
-
-
-  http.addHeader("Content-Type", "image/jpeg");
   
-  int httpResponseCode = http.POST(fb->buf, fb->len);
+  // For HTTPS URLs, we need to use a secure client instead
+  if (imageUploadUrl.startsWith("https://")) {
+    Serial.println("HTTPS URL detected, but ESP32-CAM doesn't support HTTPS without additional libraries.");
+    Serial.println("Will use HTTP instead. Make sure your API supports HTTP uploads.");
+    // In a real-world scenario, you'd want to use WiFiClientSecure with certificates
+  }
+  
+  http.begin(client, imageUploadUrl); 
+  
+  // The API expects multipart form data with fields for 'device_id' and 'file'
+  String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+  String contentType = "multipart/form-data; boundary=" + boundary;
+  http.addHeader("Content-Type", contentType);
+  
+  // Create the multipart form data manually with device_id field first
+  String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"device_id\"\r\n\r\n" + 
+                String(deviceId) + "\r\n" +
+                "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
+  String tail = "\r\n--" + boundary + "--\r\n";
+  
+  // Calculate the total size for Content-Length header
+  uint32_t imageLen = fb->len;
+  uint32_t totalLen = head.length() + imageLen + tail.length();
+  http.addHeader("Content-Length", String(totalLen));
+  
+  // Use beginRequest/write instead of POST for more control
+  http.beginRequest();
+  http.write((uint8_t*)head.c_str(), head.length());
+  http.write(fb->buf, fb->len);
+  http.write((uint8_t*)tail.c_str(), tail.length());
+  
+  // Get the response
+  int httpResponseCode = http.endRequest();
 
   if (httpResponseCode > 0) {
     String response = http.getString();
