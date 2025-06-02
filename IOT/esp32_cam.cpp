@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 const char* ssid = WIFI_SSID;
+const char* user = WIFI_USER;
 const char* password = WIFI_PASSWORD;
  
 // Use the same API URL as in the main ESP32 code
@@ -15,7 +16,8 @@ int deviceId = -1; // Will be populated after device registration
 
 // Legacy variables kept for backward compatibility
 const char* serverIpAddress = SERVER_IP; 
-const int serverPort = SERVER_PORT;
+const char* serverPortChar = SERVER_PORT;
+const int serverPort = atoi(serverPortChar);
 String imageUploadUrl; 
 
 unsigned long lastTriggerTime = 0;
@@ -129,6 +131,8 @@ void setup() {
   }
   Serial.println("Camera initialized");
 }
+
+void captureAndSendPhotoToServer();
 
 void loop() {
   if (Serial.available() > 0) {

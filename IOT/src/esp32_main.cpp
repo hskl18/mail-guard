@@ -18,7 +18,8 @@ bool isRegistered = false;
 
 // Legacy variables - can be removed if not needed elsewhere
 const char* serverIpAddress = SERVER_IP; 
-const int serverPort = SERVER_PORT;
+const char* serverPortChar = SERVER_PORT;
+const int serverPort = atoi(serverPortChar);
 
 const int REED_SW_PIN = 2;
 const int BATTERY_PIN = 34; // Analog pin to read battery voltage (if available)
@@ -29,6 +30,8 @@ unsigned long lastReedCheckTime = 0;
 const unsigned long reedCheckInterval = 2000;
 unsigned long lastHttpNotificationTime = 0;
 const unsigned long httpNotificationCooldown = 5000; 
+
+void sendHeartbeat();
 
 // Function to get clerk_id and device_id from the backend using SERIES_ID
 bool getDeviceCredentials() {
