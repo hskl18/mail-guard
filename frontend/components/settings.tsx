@@ -73,11 +73,11 @@ export default function Settings() {
       setError("");
 
       try {
-        // First fetch user's devices
-        const devicesUrl = `${API_BASE}/devices?clerk_id=${user.id}`;
-        console.log(`Fetching devices from: ${devicesUrl}`);
+        // Use the consolidated dashboard endpoint to get all devices in one call
+        const dashboardUrl = `${API_BASE}/dashboard/${user.id}`;
+        console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
-        const devicesRes = await fetch(devicesUrl, {
+        const dashboardRes = await fetch(dashboardUrl, {
           method: "GET",
           mode: "cors",
           headers: {
@@ -85,17 +85,21 @@ export default function Settings() {
           },
         });
 
-        if (!devicesRes.ok) {
-          throw new Error(`Failed to fetch devices: ${devicesRes.status}`);
+        if (!dashboardRes.ok) {
+          throw new Error(
+            `Failed to fetch dashboard data: ${dashboardRes.status}`
+          );
         }
 
-        const devicesData = await devicesRes.json();
-        console.log("Devices data:", devicesData);
+        const dashboardData = await dashboardRes.json();
+        console.log("Dashboard data:", dashboardData);
 
-        const devicesList = Array.isArray(devicesData) ? devicesData : [];
+        const devicesList = Array.isArray(dashboardData.devices)
+          ? dashboardData.devices
+          : [];
         setDevices(devicesList);
 
-        // If we have devices, fetch settings for the first one
+        // If we have devices, load settings for the first one
         if (devicesList.length > 0) {
           const device = devicesList[0];
           setCurrentDevice(device);
@@ -107,8 +111,28 @@ export default function Settings() {
             location: device.location || "",
           }));
 
-          // Fetch detailed settings
-          await loadDeviceSettings(device.id, user.id);
+          // Extract settings from the device object directly if available
+          // This avoids an extra API call if the dashboard data already contains these settings
+          if (device) {
+            setNotificationSettings({
+              mail_delivered_notify: device.mail_delivered_notify ?? true,
+              mailbox_opened_notify: device.mailbox_opened_notify ?? true,
+              mail_removed_notify: device.mail_removed_notify ?? true,
+              push_notifications: device.push_notifications ?? true,
+              email_notifications: device.email_notifications ?? false,
+            });
+
+            setDeviceSettings((prev) => ({
+              ...prev,
+              check_interval: String(device.check_interval ?? 15),
+              capture_image_on_open: device.capture_image_on_open ?? true,
+              capture_image_on_delivery:
+                device.capture_image_on_delivery ?? true,
+            }));
+          } else {
+            // If full settings aren't available in the dashboard response, fetch detailed settings
+            await loadDeviceSettings(device.id, user.id);
+          }
         }
       } catch (err: any) {
         console.error("Failed to load settings:", err);
@@ -121,7 +145,7 @@ export default function Settings() {
     loadSettings();
   }, [user, API_BASE]);
 
-  // Function to load device settings
+  // Function to load device settings (only used if not already available in dashboard data)
   const loadDeviceSettings = async (deviceId: number, clerkId: string) => {
     try {
       const settingsUrl = `${API_BASE}/devices/${deviceId}/settings?clerk_id=${clerkId}`;

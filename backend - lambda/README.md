@@ -1,3 +1,5 @@
+# Since Lambda response is not fast enough, we need to use a nextjs api route to handle the requests.
+
 # Smart Mailbox Backend API
 
 This backend service exposes RESTful endpoints for managing devices, mailbox events, image uploads, and notifications for the Smart Mailbox Monitor system.

@@ -27,6 +27,7 @@ export default function Dashboard() {
   const { user } = useUser();
   const [devices, setDevices] = useState<any[]>([]);
   const [recentEvents, setRecentEvents] = useState<any[]>([]);
+  const [recentImages, setRecentImages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -38,12 +39,11 @@ export default function Dashboard() {
       setError("");
 
       try {
-        // Log the full URL for debugging
-        const devicesUrl = `${API_BASE}/devices?clerk_id=${user.id}`;
-        console.log(`Attempting to fetch from: ${devicesUrl}`);
+        // Use the consolidated dashboard endpoint instead of multiple API calls
+        const dashboardUrl = `${API_BASE}/dashboard/${user.id}`;
+        console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
-        // Use more robust fetch with CORS mode specified
-        const devicesRes = await fetch(devicesUrl, {
+        const dashboardRes = await fetch(dashboardUrl, {
           method: "GET",
           mode: "cors",
           headers: {
@@ -51,41 +51,28 @@ export default function Dashboard() {
           },
         });
 
-        // Process the devices data
-        if (!devicesRes.ok) {
-          throw new Error(`API returned status: ${devicesRes.status}`);
+        // Process the dashboard data
+        if (!dashboardRes.ok) {
+          throw new Error(`API returned status: ${dashboardRes.status}`);
         }
 
-        const devicesData = await devicesRes.json();
-        console.log(`Devices data:`, devicesData);
-        setDevices(Array.isArray(devicesData) ? devicesData : []);
+        const dashboardData = await dashboardRes.json();
+        console.log(`Dashboard data:`, dashboardData);
 
-        // If we have devices, fetch events for the first one
-        if (devicesData && devicesData.length > 0) {
-          const deviceId = devicesData[0].id;
-          const eventsUrl = `${API_BASE}/mailbox/events?device_id=${deviceId}`;
-          console.log(`Fetching events from: ${eventsUrl}`);
-
-          const eventsRes = await fetch(eventsUrl, {
-            method: "GET",
-            mode: "cors",
-            headers: {
-              Accept: "application/json",
-            },
-          });
-
-          if (!eventsRes.ok) {
-            console.warn(
-              `Events fetch failed with status: ${eventsRes.status}`
-            );
-            // Don't throw here - just log and continue with empty events
-            setRecentEvents([]);
-          } else {
-            const eventsData = await eventsRes.json();
-            console.log(`Events data:`, eventsData);
-            setRecentEvents(Array.isArray(eventsData) ? eventsData : []);
-          }
-        }
+        // Set all the state at once from the consolidated response
+        setDevices(
+          Array.isArray(dashboardData.devices) ? dashboardData.devices : []
+        );
+        setRecentEvents(
+          Array.isArray(dashboardData.recent_events)
+            ? dashboardData.recent_events
+            : []
+        );
+        setRecentImages(
+          Array.isArray(dashboardData.recent_images)
+            ? dashboardData.recent_images
+            : []
+        );
       } catch (err: any) {
         // Detailed error logging
         console.error("Dashboard data fetch error:", err);

@@ -1,9 +1,9 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 import mysql.connector
 from mysql.connector import pooling
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -52,6 +52,11 @@ POOL: Optional[pooling.MySQLConnectionPool] = None
 # Global clients to reuse across invocations
 s3_client = None
 sns_client = None
+
+# Simple in-memory cache for dashboard data
+dashboard_cache = {}
+settings_cache = {}  # Cache for device settings
+CACHE_TTL_SECONDS = 30  # Cache expiry in seconds - keep this relatively short to ensure data freshness
 
 def init_pool():
     global POOL
@@ -394,7 +399,7 @@ async def landing_page():
 
 @app.post("/devices")
 def create_device(p: DevicePayload):
-    return _insert(
+    result = _insert(
         """
         INSERT INTO devices(
             clerk_id,
@@ -432,12 +437,17 @@ def create_device(p: DevicePayload):
             p.capture_image_on_delivery
         ),
     )
+    
+    # Invalidate dashboard cache for this user to reflect the new device
+    invalidate_caches(clerk_id=p.clerk_id)
+    
+    return result
 
 @app.get("/devices", response_model=List[Dict[str, Any]])
-def list_devices(clerk_id: str):
+def list_devices(name: str):
     return _select(
-        "SELECT * FROM devices WHERE clerk_id=%s ORDER BY created_at DESC",
-        (clerk_id,),
+        "SELECT * FROM devices WHERE name=%s ORDER BY created_at DESC",
+        (name,),
     )
 
 @app.get("/devices/{device_id}", response_model=Dict[str, Any])
@@ -452,7 +462,7 @@ def get_device(device_id: int, clerk_id: str):
 
 @app.put("/devices/{device_id}", response_model=Dict[str, int])
 def update_device(device_id: int, p: DevicePayload):
-    return _insert(
+    result = _insert(
         """
         UPDATE devices SET 
             name=%s,
@@ -489,6 +499,11 @@ def update_device(device_id: int, p: DevicePayload):
             p.clerk_id
         ),
     )
+    
+    # Invalidate relevant caches to ensure data consistency
+    invalidate_caches(device_id=device_id, clerk_id=p.clerk_id)
+    
+    return result
 
 @app.delete("/devices/{device_id}", response_model=Dict[str, int])
 def delete_device(device_id: int, clerk_id: str):
@@ -829,11 +844,32 @@ def iot_report_status(request: Request):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/dashboard/{clerk_id}", response_model=Dict[str, Any])
-def get_user_dashboard(clerk_id: str):
+def get_user_dashboard(clerk_id: str, response: Response):
     """
     Comprehensive dashboard endpoint that combines multiple data sources
-    into a single API call for frontend efficiency
+    into a single API call for frontend efficiency.
+    Uses caching to improve performance for repeated requests.
     """
+    # Check if we have a valid cached response
+    cache_key = f"dashboard_{clerk_id}"
+    cached_data = dashboard_cache.get(cache_key)
+    
+    if cached_data:
+        # Check if the cache is still valid
+        if datetime.utcnow() < cached_data['expires_at']:
+            logger.info(f"Cache hit for dashboard {clerk_id}")
+            # Add cache-related headers
+            response.headers["X-Cache"] = "HIT"
+            response.headers["X-Cache-Expires"] = cached_data['expires_at'].isoformat()
+            return cached_data['data']
+        else:
+            # Cache expired
+            logger.info(f"Cache expired for dashboard {clerk_id}")
+            dashboard_cache.pop(cache_key, None)
+    
+    # Cache miss or expired, generate fresh data
+    response.headers["X-Cache"] = "MISS"
+    
     # Get all user devices
     devices = _select(
         "SELECT * FROM devices WHERE clerk_id=%s ORDER BY last_seen DESC",
@@ -841,12 +877,18 @@ def get_user_dashboard(clerk_id: str):
     )
     
     if not devices:
-        return {
+        result = {
             "devices": [],
             "recent_events": [],
             "recent_images": [],
             "notification_count": 0
         }
+        # Cache the empty result too
+        dashboard_cache[cache_key] = {
+            'data': result,
+            'expires_at': datetime.utcnow() + timedelta(seconds=CACHE_TTL_SECONDS)
+        }
+        return result
     
     # Get device IDs
     device_ids = [d["id"] for d in devices]
@@ -879,16 +921,49 @@ def get_user_dashboard(clerk_id: str):
         tuple(device_ids),
     )
     
-    return {
+    result = {
         "devices": devices,
         "recent_events": recent_events,
         "recent_images": recent_images,
         "notification_count": notification_count[0]["count"] if notification_count else 0
     }
+    
+    # Store in cache with expiration time
+    expiry_time = datetime.utcnow() + timedelta(seconds=CACHE_TTL_SECONDS)
+    dashboard_cache[cache_key] = {
+        'data': result,
+        'expires_at': expiry_time
+    }
+    
+    # Add expiry info to response headers
+    response.headers["X-Cache-Expires"] = expiry_time.isoformat()
+    
+    logger.info(f"Generated fresh dashboard data for {clerk_id}")
+    return result
 
 @app.get("/devices/{device_id}/settings", response_model=Dict[str, Any])
-def get_device_settings(device_id: int, clerk_id: str):
+def get_device_settings(device_id: int, clerk_id: str, response: Response):
     """Get notification and device settings for a specific device"""
+    # Check if we have a valid cached response
+    cache_key = f"settings_{device_id}_{clerk_id}"
+    cached_data = settings_cache.get(cache_key)
+    
+    if cached_data:
+        # Check if the cache is still valid
+        if datetime.utcnow() < cached_data['expires_at']:
+            logger.info(f"Cache hit for device settings {device_id}")
+            # Add cache-related headers
+            response.headers["X-Cache"] = "HIT"
+            response.headers["X-Cache-Expires"] = cached_data['expires_at'].isoformat()
+            return cached_data['data']
+        else:
+            # Cache expired
+            logger.info(f"Cache expired for device settings {device_id}")
+            settings_cache.pop(cache_key, None)
+    
+    # Cache miss or expired, generate fresh data
+    response.headers["X-Cache"] = "MISS"
+    
     results = _select(
         """
         SELECT 
@@ -909,6 +984,17 @@ def get_device_settings(device_id: int, clerk_id: str):
     )
     if not results:
         raise HTTPException(status_code=404, detail="Device not found")
+    
+    # Store in cache with expiration time
+    expiry_time = datetime.utcnow() + timedelta(seconds=CACHE_TTL_SECONDS)
+    settings_cache[cache_key] = {
+        'data': results[0],
+        'expires_at': expiry_time
+    }
+    
+    # Add expiry info to response headers
+    response.headers["X-Cache-Expires"] = expiry_time.isoformat()
+    logger.info(f"Generated fresh settings data for device {device_id}")
     
     return results[0]
 
@@ -969,6 +1055,9 @@ def update_device_settings(device_id: int, p: DeviceSettingsPayload):
     # Build and execute the query
     query = f"UPDATE devices SET {', '.join(set_parts)} WHERE id=%s AND clerk_id=%s"
     _insert(query, tuple(params))
+    
+    # Invalidate relevant caches to ensure data consistency
+    invalidate_caches(device_id=device_id, clerk_id=p.clerk_id)
     
     return {"status": "updated"}
 
@@ -1092,3 +1181,25 @@ def process_notification(event, context):
             logger.error(f"Error processing notification: {e}")
             # Continue processing other records even if one fails
             continue
+
+def invalidate_caches(device_id=None, clerk_id=None):
+    """Helper function to invalidate related caches when data changes"""
+    invalidated = []
+    
+    if device_id and clerk_id:
+        # Invalidate device-specific settings
+        settings_cache_key = f"settings_{device_id}_{clerk_id}"
+        if settings_cache.get(settings_cache_key):
+            logger.info(f"Invalidating settings cache for device {device_id}")
+            settings_cache.pop(settings_cache_key, None)
+            invalidated.append(settings_cache_key)
+    
+    if clerk_id:
+        # Invalidate user dashboard data
+        dashboard_cache_key = f"dashboard_{clerk_id}"
+        if dashboard_cache.get(dashboard_cache_key):
+            logger.info(f"Invalidating dashboard cache for user {clerk_id}")
+            dashboard_cache.pop(dashboard_cache_key, None)
+            invalidated.append(dashboard_cache_key)
+    
+    return invalidated

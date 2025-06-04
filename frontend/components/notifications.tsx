@@ -57,11 +57,11 @@ export default function Notifications() {
       setError("");
 
       try {
-        // First fetch devices
-        const devicesUrl = `${API_BASE}/devices?clerk_id=${user.id}`;
-        console.log(`Fetching devices from: ${devicesUrl}`);
+        // Use the consolidated dashboard endpoint that returns all needed data in one call
+        const dashboardUrl = `${API_BASE}/dashboard/${user.id}`;
+        console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
-        const devicesRes = await fetch(devicesUrl, {
+        const dashboardRes = await fetch(dashboardUrl, {
           method: "GET",
           mode: "cors",
           headers: {
@@ -69,129 +69,72 @@ export default function Notifications() {
           },
         });
 
-        if (!devicesRes.ok) {
-          throw new Error(`Failed to fetch devices: ${devicesRes.status}`);
-        }
-
-        const devicesData = await devicesRes.json();
-        console.log("Devices data:", devicesData);
-        setDevices(Array.isArray(devicesData) ? devicesData : []);
-
-        // If we have devices, fetch notifications for each
-        if (devicesData && devicesData.length > 0) {
-          const allNotifications: any[] = [];
-
-          // For each device, fetch its notifications
-          for (const device of devicesData) {
-            const notifUrl = `${API_BASE}/mailbox/notifications?device_id=${device.id}`;
-            console.log(`Fetching notifications from: ${notifUrl}`);
-
-            const notifRes = await fetch(notifUrl, {
-              method: "GET",
-              mode: "cors",
-              headers: {
-                Accept: "application/json",
-              },
-            });
-
-            if (notifRes.ok) {
-              const deviceNotifications = await notifRes.json();
-              console.log(
-                `Got ${deviceNotifications.length} notifications for device ${device.id}`
-              );
-
-              // Enrich notifications with device info
-              const enrichedNotifications = deviceNotifications.map(
-                (n: any) => ({
-                  ...n,
-                  deviceName: device.name,
-                  deviceLocation: device.location,
-                  // Convert notification_type to type for backward compatibility with UI
-                  type: n.notification_type,
-                  time: new Date(n.sent_at).toLocaleString(),
-                  message: getNotificationMessage(
-                    n.notification_type,
-                    device.name
-                  ),
-                })
-              );
-
-              allNotifications.push(...enrichedNotifications);
-            }
-
-            // Also fetch events (which can be treated as another type of notification)
-            const eventsUrl = `${API_BASE}/mailbox/events?device_id=${device.id}`;
-            const eventsRes = await fetch(eventsUrl, {
-              method: "GET",
-              mode: "cors",
-              headers: {
-                Accept: "application/json",
-              },
-            });
-
-            if (eventsRes.ok) {
-              const deviceEvents = await eventsRes.json();
-              console.log(
-                `Got ${deviceEvents.length} events for device ${device.id}`
-              );
-
-              // Convert events to notification format
-              const eventNotifications = deviceEvents.map((e: any) => ({
-                id: `event_${e.id}`,
-                device_id: e.device_id,
-                deviceName: device.name,
-                deviceLocation: device.location,
-                type: e.event_type,
-                notification_type: e.event_type,
-                time: new Date(e.occurred_at).toLocaleString(),
-                sent_at: e.occurred_at,
-                message: getNotificationMessage(e.event_type, device.name),
-                read: true,
-                hasImage:
-                  e.event_type === "open" || e.event_type === "mail_delivered",
-              }));
-
-              allNotifications.push(...eventNotifications);
-            }
-
-            // Try to fetch images for this device
-            try {
-              const imagesUrl = `${API_BASE}/mailbox/images?device_id=${device.id}`;
-              const imageRes = await fetch(imagesUrl, {
-                method: "GET",
-                mode: "cors",
-                headers: {
-                  Accept: "application/json",
-                },
-              });
-
-              if (imageRes.ok) {
-                const imageData = await imageRes.json();
-                // Store the image URL for this device
-                if (Array.isArray(imageData) && imageData.length > 0) {
-                  const deviceImages = imageData.reduce(
-                    (acc: any, img: any) => {
-                      acc[img.device_id] = img.image_url;
-                      return acc;
-                    },
-                    {}
-                  );
-                  setImages((prev) => ({ ...prev, ...deviceImages }));
-                }
-              }
-            } catch (imgErr) {
-              console.warn("Failed to fetch images:", imgErr);
-            }
-          }
-
-          // Sort notifications by date (newest first)
-          allNotifications.sort(
-            (a, b) =>
-              new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
+        if (!dashboardRes.ok) {
+          throw new Error(
+            `Failed to fetch dashboard data: ${dashboardRes.status}`
           );
-
-          setNotifications(allNotifications);
         }
+
+        const dashboardData = await dashboardRes.json();
+        console.log("Dashboard data:", dashboardData);
+
+        // Extract and process devices
+        const devicesData = Array.isArray(dashboardData.devices)
+          ? dashboardData.devices
+          : [];
+        setDevices(devicesData);
+
+        // Extract and process events
+        const eventsData = Array.isArray(dashboardData.recent_events)
+          ? dashboardData.recent_events
+          : [];
+
+        // Extract and process images
+        const imagesData = Array.isArray(dashboardData.recent_images)
+          ? dashboardData.recent_images
+          : [];
+
+        // Create an image lookup map
+        const imageMap: { [key: string]: string } = {};
+        imagesData.forEach((img) => {
+          if (img.device_id && img.image_url) {
+            imageMap[img.device_id] = img.image_url;
+          }
+        });
+        setImages(imageMap);
+
+        // Convert events to notification format
+        const allNotifications: any[] = [];
+
+        // Process events to match the notification format
+        eventsData.forEach((event) => {
+          const device = devicesData.find((d) => d.id === event.device_id);
+          if (device) {
+            allNotifications.push({
+              id: `event_${event.id}`,
+              device_id: event.device_id,
+              deviceName: device.name,
+              deviceLocation: device.location,
+              type: event.event_type,
+              notification_type: event.event_type,
+              time: new Date(event.occurred_at).toLocaleString(),
+              sent_at: event.occurred_at,
+              message: getNotificationMessage(event.event_type, device.name),
+              read: true,
+              hasImage:
+                event.event_type === "open" ||
+                event.event_type === "mail_delivered",
+            });
+          }
+        });
+
+        // Sort notifications by date (newest first)
+        allNotifications.sort(
+          (a, b) =>
+            new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()
+        );
+
+        setNotifications(allNotifications);
       } catch (err: any) {
         console.error("Failed to load notifications:", err);
         setError(`Error loading notifications: ${err.message}`);
@@ -249,20 +192,19 @@ export default function Notifications() {
     }
   };
 
-  if (isLoading) {
+  // Show loading state
+  if (isLoading && !notifications.length) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading notifications...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
       </div>
     );
   }
 
+  // Show error state
   if (error) {
     return (
-      <div className="p-6 bg-red-50 rounded-lg text-center">
+      <div className="p-6 bg-red-50 rounded-lg">
         <p className="text-red-700">{error}</p>
         <Button
           onClick={() => window.location.reload()}
@@ -276,138 +218,114 @@ export default function Notifications() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Notifications Card */}
+    <div>
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>Recent alerts from your mailbox</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
+        <CardHeader className="border-b">
+          <div className="flex justify-between items-center">
+            <CardTitle>Activity Notifications</CardTitle>
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-gray-500" />
               <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="h-4 w-4 mr-2" />
+                <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All notifications</SelectItem>
-                  <SelectItem value="mail_delivered">Mail delivered</SelectItem>
-                  <SelectItem value="open">Mailbox opened</SelectItem>
-                  <SelectItem value="close">Mailbox closed</SelectItem>
+                  <SelectItem value="all">All Events</SelectItem>
+                  <SelectItem value="mail_delivered">Mail Delivered</SelectItem>
+                  <SelectItem value="open">Mailbox Opened</SelectItem>
+                  <SelectItem value="close">Mailbox Closed</SelectItem>
+                  <SelectItem value="mail_removed">Mail Removed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredNotifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Bell className="h-12 w-12 text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium">No notifications</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  There are no notifications matching your current filter.
-                </p>
-              </div>
-            ) : (
-              filteredNotifications.map((notification, index) => (
-                <div key={notification.id}>
-                  <div className="flex items-start gap-4">
+        <CardContent className="p-0">
+          {filteredNotifications.length > 0 ? (
+            <div className="divide-y">
+              {filteredNotifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className="p-4 flex items-start justify-between hover:bg-gray-50"
+                >
+                  <div className="flex items-start space-x-4">
                     <div
                       className={`p-2 rounded-full ${getNotificationIconBackground(
-                        notification.type || notification.notification_type
+                        notification.type
                       )}`}
                     >
-                      {getNotificationIcon(
-                        notification.type || notification.notification_type
-                      )}
+                      {getNotificationIcon(notification.type)}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium">{notification.message}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-gray-500">
-                              {notification.time}
-                            </p>
-                            {notification.deviceName && (
-                              <Badge variant="outline" className="text-xs">
-                                {notification.deviceName}
-                              </Badge>
-                            )}
-                            {!notification.read && (
-                              <Badge variant="secondary" className="text-xs">
-                                New
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        {notification.hasImage && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs"
-                            onClick={() =>
-                              openImageDialog(notification.device_id)
-                            }
-                          >
-                            <ImageIcon className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        )}
-                      </div>
+                    <div>
+                      <h4 className="font-medium text-sm">
+                        {notification.message}
+                      </h4>
+                      <p className="text-xs text-gray-500">
+                        {notification.deviceName}
+                        {notification.deviceLocation
+                          ? ` • ${notification.deviceLocation}`
+                          : ""}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {notification.time}
+                      </p>
                     </div>
                   </div>
-                  {index < filteredNotifications.length - 1 && (
-                    <Separator className="my-4" />
+
+                  {notification.hasImage && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => openImageDialog(notification.device_id)}
+                    >
+                      <ImageIcon className="h-3 w-3 mr-1" /> View
+                    </Button>
                   )}
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center">
+              <Bell className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <h3 className="font-medium">No notifications</h3>
+              <p className="text-sm text-gray-500">
+                When events occur, you'll see them here
+              </p>
+            </div>
+          )}
         </CardContent>
-        {notifications.length > 10 && (
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" size="sm">
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <Button variant="outline" size="sm">
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </CardFooter>
-        )}
+        <CardFooter className="border-t p-4 flex justify-between">
+          <Button variant="ghost" size="sm" disabled>
+            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+          </Button>
+          <Button variant="ghost" size="sm" disabled>
+            Next <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </CardFooter>
       </Card>
 
-      {/* Image Dialog */}
+      {/* Image dialog */}
       <Dialog
         open={!!selectedImage}
         onOpenChange={(open) => !open && setSelectedImage(null)}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Captured Image</DialogTitle>
             <DialogDescription>
-              Image captured when your mailbox was accessed
+              Image captured by your delivery hub
             </DialogDescription>
           </DialogHeader>
           {selectedImage && (
-            <div className="relative aspect-video overflow-hidden rounded-md">
+            <div className="flex justify-center">
               <img
                 src={selectedImage}
-                alt="Mailbox capture"
-                className="object-cover w-full"
+                alt="Captured mailbox image"
+                className="max-h-[60vh] object-contain rounded-md"
               />
             </div>
           )}
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => setSelectedImage(null)}>
-              Close
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>
@@ -425,8 +343,12 @@ function getNotificationMessage(
       return `${deviceName} was opened`;
     case "close":
       return `${deviceName} was closed`;
+    case "mail_removed":
+      return `Mail removed from ${deviceName}`;
+    case "battery_low":
+      return `Low battery alert for ${deviceName}`;
     default:
-      return `Event detected: ${type} (${deviceName})`;
+      return `${type} event from ${deviceName}`;
   }
 }
 
@@ -438,6 +360,10 @@ function getNotificationIcon(type: string) {
       return <MailOpen className="h-4 w-4 text-white" />;
     case "close":
       return <Mail className="h-4 w-4 text-white" />;
+    case "mail_removed":
+      return <Mail className="h-4 w-4 text-white" />;
+    case "battery_low":
+      return <AlertTriangle className="h-4 w-4 text-white" />;
     default:
       return <Bell className="h-4 w-4 text-white" />;
   }
@@ -450,7 +376,11 @@ function getNotificationIconBackground(type: string) {
     case "open":
       return "bg-blue-500";
     case "close":
+      return "bg-gray-500";
+    case "mail_removed":
       return "bg-amber-500";
+    case "battery_low":
+      return "bg-red-500";
     default:
       return "bg-gray-500";
   }
