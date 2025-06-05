@@ -5,12 +5,13 @@ import type { Device, DeviceSummary } from "@/lib/types";
 // GET /api/devices/[id]/summary - Get device summary with recent activity
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const clerkId = searchParams.get("clerk_id");
-    const deviceId = params.id;
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
 
     if (!clerkId) {
       return NextResponse.json(

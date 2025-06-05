@@ -5,9 +5,10 @@ import { DeviceStatusPayload } from "@/lib/types";
 // PUT /api/devices/[id]/status - Update device status
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const deviceId = parseInt(params.id);
+  const resolvedParams = await params;
+  const deviceId = parseInt(resolvedParams.id);
 
   try {
     const body: DeviceStatusPayload = await request.json();

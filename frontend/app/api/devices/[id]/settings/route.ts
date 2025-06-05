@@ -5,12 +5,13 @@ import type { Device, DeviceSettings } from "@/lib/types";
 // GET /api/devices/[id]/settings - Get device settings
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const clerkId = searchParams.get("clerk_id");
-    const deviceId = params.id;
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
 
     if (!clerkId) {
       return NextResponse.json(
@@ -56,12 +57,13 @@ export async function GET(
 // PUT /api/devices/[id]/settings - Update device settings
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json();
     const { clerk_id } = body;
-    const deviceId = params.id;
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
 
     if (!clerk_id) {
       return NextResponse.json(

@@ -5,12 +5,13 @@ import type { Device } from "@/lib/types";
 // POST /api/devices/[id]/heartbeat - Send device heartbeat
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json();
     const { clerk_id } = body;
-    const deviceId = params.id;
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
 
     if (!clerk_id) {
       return NextResponse.json(

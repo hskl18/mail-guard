@@ -5,12 +5,13 @@ import type { Device } from "@/lib/types";
 // GET /api/devices/[id] - Get a specific device
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const clerkId = searchParams.get("clerk_id");
-    const deviceId = params.id;
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
 
     if (!clerkId) {
       return NextResponse.json(
@@ -44,12 +45,13 @@ export async function GET(
 // PUT /api/devices/[id] - Update a specific device
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json();
     const { clerk_id, name, serial_number, location, is_active } = body;
-    const deviceId = params.id;
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
 
     if (!clerk_id) {
       return NextResponse.json(
@@ -129,12 +131,13 @@ export async function PUT(
 // DELETE /api/devices/[id] - Delete a specific device
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
     const clerkId = searchParams.get("clerk_id");
-    const deviceId = params.id;
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
 
     if (!clerkId) {
       return NextResponse.json(

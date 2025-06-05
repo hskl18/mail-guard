@@ -5,9 +5,10 @@ import { DeviceHealth } from "@/lib/types";
 // POST /api/devices/[id]/health - Update device health metrics
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const deviceId = parseInt(params.id);
+  const resolvedParams = await params;
+  const deviceId = parseInt(resolvedParams.id);
 
   try {
     const body: DeviceHealth = await request.json();
