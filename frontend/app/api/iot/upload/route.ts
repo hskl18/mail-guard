@@ -41,29 +41,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if IoT device exists and is activated
-    const iotDevice = await executeQuery<any[]>(
-      "SELECT * FROM iot_devices WHERE serial_number = ? AND is_activated = TRUE",
+    // Check if device serial is valid
+    const deviceSerial = await executeQuery<any[]>(
+      "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = TRUE",
       [serialNumber]
     );
 
-    if (iotDevice.length === 0) {
+    if (deviceSerial.length === 0) {
       return NextResponse.json(
         {
-          error: "Device not found or not activated",
+          error: "Invalid device serial number",
           serial_number: serialNumber,
-          action: "Please activate device first",
+          action: "Device not recognized",
         },
         { status: 404 }
       );
     }
 
-    const device = iotDevice[0];
+    const serialInfo = deviceSerial[0];
 
-    // Update device last seen
+    // Update device status
     await executeQuery(
-      "UPDATE iot_devices SET last_seen = CURRENT_TIMESTAMP WHERE id = ?",
-      [device.id]
+      `UPDATE iot_device_status 
+       SET last_seen = CURRENT_TIMESTAMP, is_online = TRUE
+       WHERE serial_number = ?`,
+      [serialNumber]
     );
 
     // Generate unique filename
@@ -73,13 +75,16 @@ export async function POST(request: NextRequest) {
       .substring(7)}.${fileExtension}`;
 
     try {
-      // Upload to S3
-      const s3Url = await uploadToS3(file, fileName);
+      // Convert file to buffer for S3 upload
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
 
-      // Check if we have a linked dashboard device
+      // Upload to S3
+      const s3Url = await uploadToS3(fileBuffer, fileName, file.type);
+
+      // Check if device is claimed by a user (linked to dashboard)
       const dashboardDevice = await executeQuery<any[]>(
-        "SELECT * FROM devices WHERE iot_device_id = ? OR serial_number = ?",
-        [device.id, serialNumber]
+        "SELECT * FROM devices WHERE serial_number = ?",
+        [serialNumber]
       );
 
       let imageRecord;
@@ -120,28 +125,11 @@ export async function POST(request: NextRequest) {
           { status: 201 }
         );
       } else {
-        // Store in IoT-specific images table
-        await executeQuery(
-          `CREATE TABLE IF NOT EXISTS iot_images (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            iot_device_id INT NOT NULL,
-            serial_number VARCHAR(255) NOT NULL,
-            image_url VARCHAR(500) NOT NULL,
-            event_type VARCHAR(50),
-            captured_at DATETIME,
-            file_size INT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_iot_device_id (iot_device_id),
-            INDEX idx_serial_number (serial_number),
-            INDEX idx_captured_at (captured_at),
-            FOREIGN KEY (iot_device_id) REFERENCES iot_devices(id) ON DELETE CASCADE
-          )`
-        );
-
+        // Store in IoT-specific images table (already created in init-db)
         imageRecord = await executeQuery(
-          `INSERT INTO iot_images (iot_device_id, serial_number, image_url, event_type, captured_at, file_size) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [device.id, serialNumber, s3Url, eventType, capturedAt, file.size]
+          `INSERT INTO iot_images (serial_number, image_url, event_type, captured_at, file_size) 
+           VALUES (?, ?, ?, ?, ?)`,
+          [serialNumber, s3Url, eventType, capturedAt, file.size]
         );
 
         return NextResponse.json(
@@ -196,25 +184,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if device exists
-    const iotDevice = await executeQuery<any[]>(
-      "SELECT * FROM iot_devices WHERE serial_number = ?",
+    // Check if device serial exists
+    const deviceSerial = await executeQuery<any[]>(
+      "SELECT * FROM device_serials WHERE serial_number = ?",
       [serialNumber]
     );
 
-    if (iotDevice.length === 0) {
+    if (deviceSerial.length === 0) {
       return NextResponse.json({ error: "Device not found" }, { status: 404 });
     }
 
-    // Try to get images from main images table first
+    // Try to get images from main images table first (if claimed)
     let dashboardQuery = `
       SELECT i.*, d.name as device_name, e.event_type as related_event
       FROM images i 
       LEFT JOIN devices d ON i.device_id = d.id 
       LEFT JOIN events e ON i.event_id = e.id
-      WHERE d.serial_number = ? OR d.iot_device_id = ?
+      WHERE d.serial_number = ?
     `;
-    const dashboardParams = [serialNumber, iotDevice[0].id];
+    const dashboardParams = [serialNumber];
 
     if (eventType) {
       dashboardQuery += " AND e.event_type = ?";
@@ -248,7 +236,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       serial_number: serialNumber,
-      device_name: iotDevice[0].device_name,
+      is_claimed: deviceSerial[0].is_claimed,
+      device_model: deviceSerial[0].device_model,
       dashboard_images: dashboardImages,
       iot_images: iotImages,
       total_images: dashboardImages.length + iotImages.length,
