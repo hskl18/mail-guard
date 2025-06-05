@@ -210,7 +210,7 @@ export async function GET(request: NextRequest) {
     }
 
     dashboardQuery += " ORDER BY i.captured_at DESC LIMIT ?";
-    dashboardParams.push(limit);
+    dashboardParams.push(limit.toString());
 
     const dashboardImages = await executeQuery<any[]>(
       dashboardQuery,
@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
     }
 
     iotQuery += " ORDER BY captured_at DESC LIMIT ?";
-    iotParams.push(limit);
+    iotParams.push(limit.toString());
 
     const iotImages = await executeQuery<any[]>(iotQuery, iotParams);
 
