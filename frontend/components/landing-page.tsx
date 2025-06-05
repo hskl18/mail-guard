@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { useState } from "react";
 import {
   Mail,
   Shield,
@@ -17,298 +22,304 @@ import {
   Package,
   Camera,
   Users,
+  BellRing,
+  CheckCircle,
+  BookOpen,
+  Menu,
+  X,
 } from "lucide-react";
 
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="container mx-auto px-4 lg:px-6 h-16 flex items-center">
-        <Link className="flex items-center justify-center" href="#">
-          <Mail className="h-6 w-6 mr-2" />
-          <span className="font-bold">Mail Guard</span>
-        </Link>
-        <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Link
-            className="text-sm font-medium hover:underline underline-offset-4"
-            href="/"
-          >
-            Home
+    <div className="flex min-h-screen flex-col bg-white">
+      {/* Enhanced Header */}
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200/50 bg-white/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/80">
+        <div className="container mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
+          <Link className="flex items-center" href="/">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg shadow-sm">
+                <Mail className="h-5 w-5 text-white" />
+              </div>
+              <span className="font-bold text-xl text-gray-900">
+                Mail Guard
+              </span>
+            </div>
           </Link>
-          <Link
-            className="text-sm font-medium hover:underline underline-offset-4"
-            href="/about"
-          >
-            About
-          </Link>
-          <Link
-            className="text-sm font-medium hover:underline underline-offset-4"
-            href="/market"
-          >
-            Market
-          </Link>
-          <Link
-            className="text-sm font-medium hover:underline underline-offset-4"
-            href="/sign-in"
-          >
-            Sign In
-          </Link>
-          <Link
-            className="text-sm font-medium hover:underline underline-offset-4"
-            href="/sign-up"
-          >
-            Sign Up
-          </Link>
-        </nav>
+
+          <nav className="hidden md:flex items-center space-x-6">
+            <Link
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors relative group"
+              href="/"
+            >
+              Home
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span>
+            </Link>
+            <Link
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors relative group"
+              href="/delivery-hub"
+            >
+              Delivery Hub
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span>
+            </Link>
+            <Link
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors relative group"
+              href="/docs"
+            >
+              API Docs
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-600 transition-all group-hover:w-full"></span>
+            </Link>
+
+            {/* Authentication-based navigation */}
+            <div className="flex items-center space-x-4 ml-4 pl-4 border-l border-gray-200">
+              <SignedOut>
+                <Link
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                  href="/sign-in"
+                >
+                  Sign In
+                </Link>
+                <Link href="/sign-up">
+                  <Button
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium shadow-sm"
+                  >
+                    Get Started
+                  </Button>
+                </Link>
+              </SignedOut>
+
+              <SignedIn>
+                <Link
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                  href="/dashboard"
+                >
+                  Dashboard
+                </Link>
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8",
+                    },
+                  }}
+                />
+              </SignedIn>
+            </div>
+          </nav>
+
+          {/* Mobile menu */}
+          <div className="md:hidden">
+            <div className="flex items-center space-x-3">
+              <SignedIn>
+                <Link
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                  href="/dashboard"
+                >
+                  Dashboard
+                </Link>
+                <UserButton
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8",
+                    },
+                  }}
+                />
+              </SignedIn>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="h-8 w-8 p-0"
+              >
+                {mobileMenuOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <Menu className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+
+            {/* Mobile Navigation Menu */}
+            {mobileMenuOpen && (
+              <div className="absolute top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-lg">
+                <div className="container mx-auto px-4 py-4">
+                  <nav className="flex flex-col space-y-4">
+                    <Link
+                      href="/"
+                      className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Home
+                    </Link>
+                    <Link
+                      href="/delivery-hub"
+                      className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Delivery Hub
+                    </Link>
+                    <Link
+                      href="/docs"
+                      className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      API Docs
+                    </Link>
+                    <div className="border-t border-gray-200 pt-4">
+                      <SignedOut>
+                        <div className="flex flex-col space-y-3">
+                          <Link
+                            href="/sign-in"
+                            className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Sign In
+                          </Link>
+                          <Link
+                            href="/sign-up"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Button
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm w-fit"
+                            >
+                              Get Started
+                            </Button>
+                          </Link>
+                        </div>
+                      </SignedOut>
+                    </div>
+                  </nav>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
+
       <main className="flex-1">
-        <section className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="grid gap-8 lg:grid-cols-2 items-center">
-              <div className="flex flex-col justify-center space-y-6 text-center lg:text-left">
+        {/* Hero Section - Enhanced */}
+        <section className="w-full py-16 md:py-24 lg:py-32 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50"></div>
+          <div className="container mx-auto px-4 md:px-6 relative">
+            <div className="grid gap-12 lg:grid-cols-2 items-center">
+              <div className="flex flex-col justify-center space-y-8 text-center lg:text-left">
                 <div className="space-y-4">
-                  <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl">
-                    Secure Delivery Hub for Shared Spaces
+                  <Badge variant="outline" className="w-fit mx-auto lg:mx-0">
+                    🏠 Smart Mailbox Technology
+                  </Badge>
+                  <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                    Smart Cluster Mailbox
                   </h1>
-                  <p className="mx-auto lg:mx-0 max-w-[600px] text-gray-500 md:text-xl">
-                    Mail Guard transforms shared mail areas into secure,
-                    monitored delivery hubs with real-time tracking,
-                    notifications, and photo evidence.
+                  <p className="mx-auto lg:mx-0 max-w-[600px] text-gray-600 text-lg md:text-xl leading-relaxed">
+                    Advanced cluster mailboxes with integrated smart features
+                    that identify mail types, send instant notifications upon
+                    delivery, monitor fullness levels, and provide individual
+                    serial numbers for each compartment.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                   <Link href="/dashboard">
-                    <Button size="lg" className="w-full sm:w-auto">
+                    <Button
+                      size="lg"
+                      className="w-full sm:w-auto text-base px-8 py-3"
+                    >
                       Get Started
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
-                  <Link href="/about">
+                  <Link href="/delivery-hub">
                     <Button
                       variant="outline"
                       size="lg"
-                      className="w-full sm:w-auto"
+                      className="w-full sm:w-auto text-base px-8 py-3"
                     >
-                      Learn More
+                      Explore Features
                     </Button>
                   </Link>
                 </div>
               </div>
-              <div className="flex items-center justify-center mt-6 lg:mt-0">
-                <img
-                  alt="Delivery Hub"
-                  className="w-full max-w-lg rounded-xl shadow-xl object-cover object-center"
-                  src="case.png"
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-gray-100">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                  Designed for Multi-Tenant Environments
-                </h2>
-                <p className="mx-auto text-gray-500 md:text-xl">
-                  Perfect solution for shared mail areas in various settings
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
-                <School className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold">College Campuses</h3>
-                <p className="text-center text-gray-500">
-                  Secure mail delivery for student dorms and university housing
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
-                <Building className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold">Apartment Complexes</h3>
-                <p className="text-center text-gray-500">
-                  Monitor shared mailboxes in multi-tenant apartment buildings
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
-                <Home className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold text-center">
-                  HOA & Gated Communities
-                </h3>
-                <p className="text-center text-gray-500">
-                  Secure monitoring for community mail kiosks and package areas
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white h-full">
-                <Briefcase className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold">Office Buildings</h3>
-                <p className="text-center text-gray-500">
-                  Complete solution for corporate mailrooms and package
-                  management
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="how-it-works" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                  How It Works
-                </h2>
-                <p className="mx-auto text-gray-500 md:text-xl">
-                  Simple setup, powerful protection for shared mail areas
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-5xl mx-auto">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <span className="text-xl font-bold">1</span>
+              <div className="flex items-center justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-2xl blur-2xl opacity-20 scale-105"></div>
+                  <img
+                    alt="Smart Cluster Mailbox"
+                    className="relative w-full max-w-lg rounded-2xl shadow-2xl object-cover border border-gray-200"
+                    src="mailbox.png"
+                  />
                 </div>
-                <h3 className="text-xl font-bold">Install the System</h3>
-                <p className="text-center text-gray-500">
-                  Easily retrofit our sensors to existing mailboxes or lockers.
-                  No major modifications required.
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <span className="text-xl font-bold">2</span>
-                </div>
-                <h3 className="text-xl font-bold">Connect to Network</h3>
-                <p className="text-center text-gray-500">
-                  Secure connection to your building's WiFi or cellular network
-                  through our cloud platform.
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <span className="text-xl font-bold">3</span>
-                </div>
-                <h3 className="text-xl font-bold">Manage & Monitor</h3>
-                <p className="text-center text-gray-500">
-                  Administrators and residents access real-time delivery
-                  information through web dashboard or mobile app.
-                </p>
               </div>
             </div>
           </div>
         </section>
 
-        <section
-          id="features"
-          className="w-full py-12 md:py-24 lg:py-32 bg-gray-100"
-        >
+        {/* Features Section - Enhanced */}
+        <section className="w-full py-16 md:py-24 lg:py-32 bg-gray-50">
           <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                  Key Features
-                </h2>
-                <p className="mx-auto text-gray-500 md:text-xl">
-                  Everything you need for secure, efficient mail management
-                </p>
-              </div>
+            <div className="text-center mb-16">
+              <Badge variant="secondary" className="mb-4">
+                Core Features
+              </Badge>
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
+                Advanced Monitoring Capabilities
+              </h2>
+              <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
+                State-of-the-art technology built into every cluster mailbox
+                compartment
+              </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white">
-                <Package className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold">Secure Package Drop</h3>
-                <p className="text-center text-gray-500">
-                  Track every access to your delivery hub with timestamped
-                  records of all door events.
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white">
-                <Camera className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold">Photo Evidence</h3>
-                <p className="text-center text-gray-500">
-                  Capture images each time the mail area is accessed for visual
-                  verification of deliveries.
-                </p>
-              </div>
-              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm bg-white">
-                <Bell className="h-12 w-12 text-primary" />
-                <h3 className="text-xl font-bold">Real-time Notifications</h3>
-                <p className="text-center text-gray-500">
-                  Residents receive instant alerts when their mail arrives via
-                  email, SMS, or mobile app.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="connection" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                  Connecting the Ecosystem
-                </h2>
-                <p className="mx-auto text-gray-500 md:text-xl">
-                  Mail Guard brings together all delivery stakeholders in one
-                  platform
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-5xl mx-auto">
-              <div className="flex flex-col space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 mt-1">
-                    <Building className="h-8 w-8 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">
-                      Property Management
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200 transition-colors">
+                      <Package className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Mail Type Detection
                     </h3>
-                    <p className="text-gray-500">
-                      Streamlined mail processing for building staff with
-                      reduced management overhead and increased security.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 mt-1">
-                    <Users className="h-8 w-8 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">Residents</h3>
-                    <p className="text-gray-500">
-                      Convenient notifications and peace of mind knowing
-                      deliveries are secure and monitored.
+                    <p className="text-gray-600 leading-relaxed">
+                      Smart sensors automatically identify different types of
+                      mail and packages, providing detailed delivery information
+                      and categorization.
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 mt-1">
-                    <Mail className="h-8 w-8 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">
-                      Couriers & Delivery Services
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
+                      <BellRing className="h-8 w-8 text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Fullness Monitoring
                     </h3>
-                    <p className="text-gray-500">
-                      Simplified delivery process with proof of delivery and
-                      reduced failed delivery attempts.
+                    <p className="text-gray-600 leading-relaxed">
+                      Real-time tracking of compartment capacity with
+                      intelligent notifications when approaching maximum
+                      capacity.
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0 mt-1">
-                    <Shield className="h-8 w-8 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">Security Staff</h3>
-                    <p className="text-gray-500">
-                      Enhanced security oversight with timestamped access
-                      records and visual verification.
+              </div>
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-purple-100 rounded-xl group-hover:bg-purple-200 transition-colors">
+                      <Camera className="h-8 w-8 text-purple-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Serial Number Access
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      Each compartment features a unique serial number for
+                      seamless website integration and comprehensive status
+                      monitoring.
                     </p>
                   </div>
                 </div>
@@ -317,258 +328,329 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section
-          id="pricing"
-          className="w-full py-12 md:py-24 lg:py-32 bg-gray-100"
-        >
+        {/* Key Features Section - Enhanced */}
+        <section className="w-full py-16 md:py-24 lg:py-32 bg-gray-50">
           <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                  Simple, Transparent Pricing
-                </h2>
-                <p className="mx-auto text-gray-500 md:text-xl">
-                  Flexible plans for different property sizes
-                </p>
-              </div>
+            <div className="text-center mb-16">
+              <Badge variant="secondary" className="mb-4">
+                Platform Features
+              </Badge>
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
+                Complete Mail Management
+              </h2>
+              <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
+                Everything you need for secure, efficient mail management and
+                monitoring
+              </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              <div className="flex flex-col rounded-lg border p-6 shadow-sm bg-white">
-                <div className="mb-6">
-                  <h3 className="text-xl font-bold">Small Property</h3>
-                  <p className="text-gray-500 mt-1">Up to 50 units</p>
-                  <div className="mt-4 flex items-baseline">
-                    <span className="text-3xl font-bold">$199</span>
-                    <span className="ml-1 text-gray-500">/month</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-orange-100 rounded-xl group-hover:bg-orange-200 transition-colors">
+                      <Package className="h-8 w-8 text-orange-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Secure Package Drop
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      Track every access to your delivery hub with comprehensive
+                      timestamped records of all door events and activities.
+                    </p>
                   </div>
                 </div>
-                <ul className="mb-6 space-y-2">
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>All core features</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Up to 5 monitored mail areas</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Email & SMS notifications</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Basic analytics</span>
-                  </li>
-                </ul>
-                <Link href="/sign-up" className="mt-auto">
-                  <Button className="w-full">Get Started</Button>
-                </Link>
               </div>
-              <div className="flex flex-col rounded-lg border-2 border-primary p-6 shadow-lg bg-white relative">
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-primary text-white px-3 py-1 rounded-full text-sm font-bold">
-                  Most Popular
-                </div>
-                <div className="mb-6">
-                  <h3 className="text-xl font-bold">Medium Property</h3>
-                  <p className="text-gray-500 mt-1">50-200 units</p>
-                  <div className="mt-4 flex items-baseline">
-                    <span className="text-3xl font-bold">$399</span>
-                    <span className="ml-1 text-gray-500">/month</span>
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-indigo-100 rounded-xl group-hover:bg-indigo-200 transition-colors">
+                      <Camera className="h-8 w-8 text-indigo-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Photo Evidence
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      Automatic image capture during mail area access events for
+                      complete visual verification and security documentation.
+                    </p>
                   </div>
                 </div>
-                <ul className="mb-6 space-y-2">
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>All Small Property features</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Up to 15 monitored mail areas</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Mobile app for residents</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Advanced analytics & reports</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Admin dashboard</span>
-                  </li>
-                </ul>
-                <Link href="/sign-up" className="mt-auto">
-                  <Button className="w-full">Get Started</Button>
-                </Link>
               </div>
-              <div className="flex flex-col rounded-lg border p-6 shadow-sm bg-white">
-                <div className="mb-6">
-                  <h3 className="text-xl font-bold">Large Property</h3>
-                  <p className="text-gray-500 mt-1">200+ units</p>
-                  <div className="mt-4 flex items-baseline">
-                    <span className="text-3xl font-bold">$799</span>
-                    <span className="ml-1 text-gray-500">/month</span>
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-red-100 rounded-xl group-hover:bg-red-200 transition-colors">
+                      <Bell className="h-8 w-8 text-red-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Real-time Notifications
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      Instant alerts delivered via email, SMS, or mobile app
+                      whenever mail arrives or is accessed from your
+                      compartment.
+                    </p>
                   </div>
                 </div>
-                <ul className="mb-6 space-y-2">
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>All Medium Property features</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Unlimited monitored mail areas</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>API integration</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Custom branding</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
-                    <span>Dedicated account manager</span>
-                  </li>
-                </ul>
-                <Link href="/sign-up" className="mt-auto">
-                  <Button className="w-full">Get Started</Button>
-                </Link>
               </div>
             </div>
-          </div>
-        </section>
-
-        <section id="faq" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2 max-w-3xl">
-                <h2 className="text-3xl font-bold tracking-tighter md:text-4xl">
-                  Frequently Asked Questions
-                </h2>
-                <p className="mx-auto text-gray-500 md:text-xl">
-                  Find answers to common questions about Mail Guard Delivery Hub
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-              <div className="rounded-lg border p-6 shadow-sm">
-                <h3 className="text-lg font-bold mb-2">
-                  How does the retrofit installation work?
-                </h3>
-                <p className="text-gray-500">
-                  Our system is designed to work with existing mailboxes and
-                  delivery lockers. The non-invasive installation process uses
-                  adhesive mounts and wireless sensors that don't require
-                  drilling or permanent modifications.
-                </p>
-              </div>
-              <div className="rounded-lg border p-6 shadow-sm">
-                <h3 className="text-lg font-bold mb-2">
-                  Do residents need to download an app?
-                </h3>
-                <p className="text-gray-500">
-                  While we offer a mobile app for the best experience, residents
-                  can also receive notifications via email or SMS and access
-                  their delivery information through a web dashboard.
-                </p>
-              </div>
-              <div className="rounded-lg border p-6 shadow-sm">
-                <h3 className="text-lg font-bold mb-2">
-                  Is there a hardware purchase required?
-                </h3>
-                <p className="text-gray-500">
-                  The hardware is included in your monthly subscription. We
-                  handle all maintenance and updates to ensure your system stays
-                  current with the latest technology.
-                </p>
-              </div>
-              <div className="rounded-lg border p-6 shadow-sm">
-                <h3 className="text-lg font-bold mb-2">
-                  How does the system handle power outages?
-                </h3>
-                <p className="text-gray-500">
-                  Our sensors are battery-powered with a typical 6-12 month
-                  life. The system will continue to function during power
-                  outages as long as there's an internet connection available.
-                </p>
-              </div>
-              <div className="rounded-lg border p-6 shadow-sm">
-                <h3 className="text-lg font-bold mb-2">
-                  Can the system integrate with our property management
-                  software?
-                </h3>
-                <p className="text-gray-500">
-                  Yes, our Medium and Large plans include API access for
-                  integration with popular property management systems, allowing
-                  for seamless resident data synchronization.
-                </p>
-              </div>
-              <div className="rounded-lg border p-6 shadow-sm">
-                <h3 className="text-lg font-bold mb-2">
-                  How is resident data privacy protected?
-                </h3>
-                <p className="text-gray-500">
-                  We take privacy seriously. All data is encrypted, and we never
-                  share information with third parties. Images are only
-                  accessible to authorized property staff and the specific
-                  resident.
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-center mt-12">
-              <Link href="/contact">
-                <Button variant="outline" size="lg">
-                  Still have questions? Contact us
+            <div className="text-center">
+              <Link href="/delivery-hub">
+                <Button
+                  variant="link"
+                  size="lg"
+                  className="text-primary font-semibold"
+                >
+                  View complete feature list →
                 </Button>
               </Link>
             </div>
           </div>
         </section>
 
-        <section className="w-full py-12 md:py-16 lg:py-20 bg-primary text-white">
-          <div className="container mx-auto px-4 md:px-6 text-center">
-            <h2 className="text-2xl font-bold tracking-tighter md:text-3xl mb-4">
-              Ready to upgrade your property's delivery system?
-            </h2>
-            <p className="mx-auto max-w-[600px] mb-6">
-              Join leading properties, campuses, and offices that trust Mail
-              Guard for secure package management
-            </p>
-            <Link href="/sign-up">
-              <Button
-                size="lg"
-                variant="secondary"
-                className="bg-white text-primary hover:bg-gray-100"
-              >
-                Schedule a Demo
-              </Button>
-            </Link>
+        {/* Target Audience Section - Enhanced */}
+        <section className="w-full py-16 md:py-24 lg:py-32">
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="text-center mb-16">
+              <Badge variant="outline" className="mb-4">
+                🏢 Premium Properties
+              </Badge>
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
+                Perfect for Premium Properties
+              </h2>
+              <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
+                Designed specifically for luxury developments and sophisticated
+                communities
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-cyan-100 rounded-xl group-hover:bg-cyan-200 transition-colors">
+                      <Building className="h-8 w-8 text-cyan-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Luxury Apartments
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      High-end residential complexes with premium amenities
+                      requiring sophisticated mail management solutions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-emerald-100 rounded-xl group-hover:bg-emerald-200 transition-colors">
+                      <Home className="h-8 w-8 text-emerald-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      HOA Communities
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      Gated communities and homeowner associations seeking
+                      enhanced security and convenience for all residents.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="group">
+                <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="p-3 bg-yellow-100 rounded-xl group-hover:bg-yellow-200 transition-colors">
+                      <Star className="h-8 w-8 text-yellow-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      New Construction
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">
+                      Modern developments incorporating cutting-edge smart
+                      infrastructure from the ground up.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Integration Section - Enhanced */}
+        <section className="w-full py-16 md:py-24 lg:py-32">
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="max-w-4xl mx-auto text-center">
+              <Badge variant="outline" className="mb-6">
+                ✨ Ready to Use
+              </Badge>
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-6">
+                Integrated Smart Technology
+              </h2>
+              <p className="text-gray-600 text-lg md:text-xl leading-relaxed mb-8 max-w-3xl mx-auto">
+                Our cluster mailboxes come with all smart features pre-installed
+                and ready to use. Mailbox owners receive{" "}
+                <span className="font-semibold text-primary">
+                  free membership
+                </span>{" "}
+                to our comprehensive Delivery Hub platform.
+              </p>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 mb-8">
+                <div className="flex flex-col md:flex-row items-center justify-center gap-6">
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                    <span className="font-medium">Pre-installed sensors</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                    <span className="font-medium">Cloud connectivity</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                    <span className="font-medium">Free platform access</span>
+                  </div>
+                </div>
+              </div>
+              <Link href="/delivery-hub">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-base px-8 py-3"
+                >
+                  Explore Delivery Hub Features
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Section - Enhanced */}
+        <section className="w-full py-16 md:py-24 lg:py-32 bg-gray-50">
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="text-center mb-16">
+              <Badge variant="secondary" className="mb-4">
+                ❓ Support
+              </Badge>
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
+                Frequently Asked Questions
+              </h2>
+              <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
+                Find answers to common questions about our smart mailbox
+                technology
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+              {[
+                {
+                  q: "How does the smart technology work?",
+                  a: "Our cluster mailboxes come with integrated sensors, cameras, and connectivity built right in. No additional installation or setup required - everything works out of the box.",
+                },
+                {
+                  q: "Do I need to download an app?",
+                  a: "While we offer a mobile app for the best experience, you can also receive notifications via email or SMS and access information through our web dashboard.",
+                },
+                {
+                  q: "What's included with my mailbox?",
+                  a: "Every smart mailbox includes all sensors, camera system, cloud connectivity, and free access to our Delivery Hub platform with no additional subscription fees.",
+                },
+                {
+                  q: "How reliable is the system?",
+                  a: "Our sensors are battery-powered with 6-12 month life and continue working during power outages. The system maintains 99.9% uptime with automatic updates.",
+                },
+                {
+                  q: "Can I integrate with other systems?",
+                  a: "Yes, our platform includes API access for integration with property management systems, building automation, and other smart home technologies.",
+                },
+                {
+                  q: "How is my privacy protected?",
+                  a: "All data is encrypted end-to-end. Images and information are only accessible to authorized users, and we never share data with third parties.",
+                },
+              ].map((faq, index) => (
+                <div key={index} className="group">
+                  <div className="rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300">
+                    <h3 className="text-lg font-bold text-gray-900 mb-3 group-hover:text-primary transition-colors">
+                      {faq.q}
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed">{faq.a}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       </main>
-      <footer className="border-t">
-        <div className="container mx-auto px-4 md:px-6 py-6">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-xs text-gray-500">
-              © 2025 Mail Guard Delivery Hub. All rights reserved.
-            </p>
-            <nav className="flex gap-4 sm:gap-6">
-              <Link
-                className="text-xs hover:underline underline-offset-4"
-                href="#"
-              >
-                Terms of Service
+
+      {/* Enhanced Footer */}
+      <footer className="border-t bg-white">
+        <div className="container mx-auto px-4 md:px-6 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            <div className="col-span-1 md:col-span-2">
+              <Link href="/" className="flex items-center space-x-2 mb-4">
+                <div className="p-2 bg-primary rounded-lg">
+                  <Mail className="h-5 w-5 text-white" />
+                </div>
+                <span className="font-bold text-xl">Mail Guard</span>
               </Link>
-              <Link
-                className="text-xs hover:underline underline-offset-4"
-                href="#"
-              >
-                Privacy
-              </Link>
-            </nav>
+              <p className="text-gray-600 leading-relaxed max-w-md">
+                Smart cluster mailbox technology with integrated monitoring,
+                notifications, and security features for premium properties.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Product</h4>
+              <nav className="space-y-2">
+                <Link
+                  href="/delivery-hub"
+                  className="block text-gray-600 hover:text-primary transition-colors"
+                >
+                  Delivery Hub
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="block text-gray-600 hover:text-primary transition-colors"
+                >
+                  Dashboard
+                </Link>
+              </nav>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Support</h4>
+              <nav className="space-y-2">
+                <Link
+                  href="#"
+                  className="block text-gray-600 hover:text-primary transition-colors"
+                >
+                  Help Center
+                </Link>
+                <Link
+                  href="#"
+                  className="block text-gray-600 hover:text-primary transition-colors"
+                >
+                  Contact Us
+                </Link>
+              </nav>
+            </div>
+          </div>
+          <div className="border-t pt-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <p className="text-sm text-gray-500">
+                © 2025 Mail Guard. All rights reserved.
+              </p>
+              <nav className="flex gap-6">
+                <Link
+                  href="#"
+                  className="text-sm text-gray-500 hover:text-primary transition-colors"
+                >
+                  Terms of Service
+                </Link>
+                <Link
+                  href="#"
+                  className="text-sm text-gray-500 hover:text-primary transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+              </nav>
+            </div>
           </div>
         </div>
       </footer>

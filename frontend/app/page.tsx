@@ -1,14 +1,9 @@
-import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import LandingPage from "@/components/landing-page";
 
 export default async function Home() {
-  const { userId, redirectToSignIn } = await auth();
+  const { userId } = await auth();
 
-  if (userId) {
-    // User is authenticated, redirect to the dashboard
-    redirect("/dashboard");
-  }
-
+  // Always show the landing page, regardless of authentication status
   return <LandingPage />;
 }

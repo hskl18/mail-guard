@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/dialog";
 
 export default function Notifications() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
   const { user } = useUser();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
@@ -57,16 +56,16 @@ export default function Notifications() {
       setError("");
 
       try {
-        // Use the consolidated dashboard endpoint that returns all needed data in one call
-        const dashboardUrl = `${API_BASE}/dashboard/${user.id}`;
+        // Use the Next.js API route for dashboard data
+        const dashboardUrl = `/api/dashboard?clerk_id=${user.id}`;
         console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
         const dashboardRes = await fetch(dashboardUrl, {
           method: "GET",
-          mode: "cors",
           headers: {
-            Accept: "application/json",
+            "Content-Type": "application/json",
           },
+          cache: "no-cache",
         });
 
         if (!dashboardRes.ok) {
@@ -96,7 +95,7 @@ export default function Notifications() {
 
         // Create an image lookup map
         const imageMap: { [key: string]: string } = {};
-        imagesData.forEach((img) => {
+        imagesData.forEach((img: any) => {
           if (img.device_id && img.image_url) {
             imageMap[img.device_id] = img.image_url;
           }
@@ -107,8 +106,8 @@ export default function Notifications() {
         const allNotifications: any[] = [];
 
         // Process events to match the notification format
-        eventsData.forEach((event) => {
-          const device = devicesData.find((d) => d.id === event.device_id);
+        eventsData.forEach((event: any) => {
+          const device = devicesData.find((d: any) => d.id === event.device_id);
           if (device) {
             allNotifications.push({
               id: `event_${event.id}`,
@@ -173,7 +172,7 @@ export default function Notifications() {
     };
 
     loadNotifications();
-  }, [user, API_BASE]);
+  }, [user]);
 
   const filteredNotifications =
     filter === "all"

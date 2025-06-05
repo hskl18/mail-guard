@@ -23,7 +23,6 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 
 export default function Dashboard() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
   const { user } = useUser();
   const [devices, setDevices] = useState<any[]>([]);
   const [recentEvents, setRecentEvents] = useState<any[]>([]);
@@ -39,21 +38,24 @@ export default function Dashboard() {
       setError("");
 
       try {
-        // Use the consolidated dashboard endpoint instead of multiple API calls
-        const dashboardUrl = `${API_BASE}/dashboard/${user.id}`;
+        // Use the Next.js API route instead of external API
+        const dashboardUrl = `/api/dashboard?clerk_id=${user.id}`;
         console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
         const dashboardRes = await fetch(dashboardUrl, {
           method: "GET",
-          mode: "cors",
           headers: {
-            Accept: "application/json",
+            "Content-Type": "application/json",
           },
+          cache: "no-cache", // Prevent caching issues
         });
 
         // Process the dashboard data
         if (!dashboardRes.ok) {
-          throw new Error(`API returned status: ${dashboardRes.status}`);
+          const errorText = await dashboardRes.text();
+          throw new Error(
+            `API returned status: ${dashboardRes.status} - ${errorText}`
+          );
         }
 
         const dashboardData = await dashboardRes.json();
@@ -77,13 +79,11 @@ export default function Dashboard() {
         // Detailed error logging
         console.error("Dashboard data fetch error:", err);
 
-        // Create user-friendly error message with technical details
+        // Create user-friendly error message
         const errorMessage = err.message || "Unknown error";
-        setError(
-          `Could not connect to the API server. This might be due to CORS restrictions or the server being unavailable. Technical details: ${errorMessage}`
-        );
+        setError(`Could not load dashboard data. ${errorMessage}`);
 
-        // Temporary: Use mock data if API is unavailable during development
+        // Mock data for development
         if (process.env.NODE_ENV === "development") {
           console.log("Using mock data in development mode");
           setDevices([
@@ -100,7 +100,7 @@ export default function Dashboard() {
             {
               id: 1,
               device_id: 999,
-              event_type: "mail_delivered",
+              event_type: "open",
               occurred_at: new Date().toISOString(),
             },
           ]);
@@ -111,7 +111,7 @@ export default function Dashboard() {
     };
 
     loadDashboardData();
-  }, [user, API_BASE]);
+  }, [user?.id]);
 
   // Show loading state
   if (isLoading && !devices.length) {
@@ -148,16 +148,41 @@ export default function Dashboard() {
       <div className="flex flex-col items-center justify-center py-20">
         <p className="mb-4 text-gray-600">No delivery hubs connected yet.</p>
         <Link href="/connect-device">
-          <Button>Connect Delivery Hub</Button>
+          <Button>Connect Mailbox</Button>
         </Link>
       </div>
     );
   }
+
+  // Event type display mapping
+  const getEventDisplay = (eventType: string) => {
+    switch (eventType) {
+      case "open":
+        return {
+          icon: MailOpen,
+          text: "Mailbox opened",
+          color: "text-blue-500",
+        };
+      case "close":
+        return { icon: Mail, text: "Mailbox closed", color: "text-gray-500" };
+      case "delivery":
+        return { icon: Mail, text: "Mail delivered", color: "text-green-500" };
+      case "removal":
+        return { icon: Mail, text: "Mail removed", color: "text-amber-500" };
+      default:
+        return {
+          icon: Clock,
+          text: eventType.replace(/_/g, " "),
+          color: "text-gray-500",
+        };
+    }
+  };
+
   return (
     <div>
       <div className="flex justify-end mb-4">
         <Link href="/connect-device">
-          <Button>Connect Delivery Hub</Button>
+          <Button>Connect Mailbox</Button>
         </Link>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -168,23 +193,33 @@ export default function Dashboard() {
             <CardDescription>Info for {currentDevice.name}</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">
-              <strong>ID:</strong> {currentDevice.id}
-            </p>
-            <p className="text-sm">
-              <strong>Location:</strong> {currentDevice.location || "—"}
-            </p>
-            <p className="text-sm">
-              <strong>Last Seen:</strong>{" "}
-              {new Date(currentDevice.last_seen).toLocaleString()}
-            </p>
-            <p className="text-sm">
-              <strong>Active:</strong> {currentDevice.is_active ? "Yes" : "No"}
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm">
+                <strong>Serial Number:</strong>{" "}
+                {currentDevice.serial_number || "—"}
+              </p>
+              <p className="text-sm">
+                <strong>Location:</strong> {currentDevice.location || "—"}
+              </p>
+              <p className="text-sm">
+                <strong>Last Seen:</strong>{" "}
+                {currentDevice.last_seen
+                  ? new Date(currentDevice.last_seen).toLocaleString()
+                  : "Never"}
+              </p>
+              <div className="flex items-center gap-2">
+                <strong className="text-sm">Status:</strong>
+                <Badge
+                  variant={currentDevice.is_active ? "default" : "secondary"}
+                >
+                  {currentDevice.is_active ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Quick Actions Card (for {currentDevice.name}) */}
+        {/* Quick Actions Card */}
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
@@ -212,43 +247,37 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentEvents.map((event, index) => (
-                <div key={event.id}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      {event.event_type === "mail_delivered" && (
-                        <Mail className="h-4 w-4 text-green-500" />
-                      )}
-                      {event.event_type === "mailbox_opened" && (
-                        <MailOpen className="h-4 w-4 text-blue-500" />
-                      )}
-                      {event.event_type === "mail_removed" && (
-                        <Mail className="h-4 w-4 text-amber-500" />
-                      )}
-                      {event.event_type === "mailbox_closed" && (
-                        <Mail className="h-4 w-4 text-gray-500" />
-                      )}
-                      <div>
-                        <p className="text-sm font-medium">
-                          {event.event_type.replace(/_/g, " ")}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(event.occurred_at).toLocaleString()}
-                        </p>
+              {recentEvents.map((event, index) => {
+                const {
+                  icon: IconComponent,
+                  text,
+                  color,
+                } = getEventDisplay(event.event_type);
+                return (
+                  <div key={event.id}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <IconComponent className={`h-4 w-4 ${color}`} />
+                        <div>
+                          <p className="text-sm font-medium">{text}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(event.occurred_at).toLocaleString()}
+                          </p>
+                        </div>
                       </div>
+                      {(event.event_type === "open" ||
+                        event.event_type === "delivery") && (
+                        <Button variant="ghost" size="sm" className="text-xs">
+                          View Image
+                        </Button>
+                      )}
                     </div>
-                    {(event.event_type === "mailbox_opened" ||
-                      event.event_type === "mail_delivered") && (
-                      <Button variant="ghost" size="sm" className="text-xs">
-                        View Image
-                      </Button>
+                    {index < recentEvents.length - 1 && (
+                      <Separator className="my-2" />
                     )}
                   </div>
-                  {index < recentEvents.length - 1 && (
-                    <Separator className="my-2" />
-                  )}
-                </div>
-              ))}
+                );
+              })}
               {recentEvents.length === 0 && (
                 <p className="text-sm text-gray-500 text-center py-4">
                   No recent activity recorded

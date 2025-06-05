@@ -42,9 +42,7 @@ export default function ConnectDevicePage() {
     setIsSubmitting(true);
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-
-      const response = await fetch(`${API_BASE}/devices`, {
+      const response = await fetch("/api/devices", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -37,7 +37,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 
 export default function Settings() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
   const { user } = useUser();
   const { openUserProfile } = useClerk();
   const [isLoading, setIsLoading] = useState(true);
@@ -73,16 +72,16 @@ export default function Settings() {
       setError("");
 
       try {
-        // Use the consolidated dashboard endpoint to get all devices in one call
-        const dashboardUrl = `${API_BASE}/dashboard/${user.id}`;
+        // Use the Next.js API route for dashboard data
+        const dashboardUrl = `/api/dashboard?clerk_id=${user.id}`;
         console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
         const dashboardRes = await fetch(dashboardUrl, {
           method: "GET",
-          mode: "cors",
           headers: {
-            Accept: "application/json",
+            "Content-Type": "application/json",
           },
+          cache: "no-cache",
         });
 
         if (!dashboardRes.ok) {
@@ -143,19 +142,18 @@ export default function Settings() {
     };
 
     loadSettings();
-  }, [user, API_BASE]);
+  }, [user]);
 
   // Function to load device settings (only used if not already available in dashboard data)
   const loadDeviceSettings = async (deviceId: number, clerkId: string) => {
     try {
-      const settingsUrl = `${API_BASE}/devices/${deviceId}/settings?clerk_id=${clerkId}`;
+      const settingsUrl = `/api/devices/${deviceId}/settings?clerk_id=${clerkId}`;
       console.log(`Fetching device settings from: ${settingsUrl}`);
 
       const settingsRes = await fetch(settingsUrl, {
         method: "GET",
-        mode: "cors",
         headers: {
-          Accept: "application/json",
+          "Content-Type": "application/json",
         },
       });
 
@@ -226,13 +224,11 @@ export default function Settings() {
       };
 
       // Update device settings
-      const settingsUrl = `${API_BASE}/devices/${currentDevice.id}/settings`;
+      const settingsUrl = `/api/devices/${currentDevice.id}/settings`;
       const settingsRes = await fetch(settingsUrl, {
         method: "PUT",
-        mode: "cors",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
         },
         body: JSON.stringify(settingsPayload),
       });
@@ -254,13 +250,11 @@ export default function Settings() {
           is_active: currentDevice.is_active,
         };
 
-        const deviceUrl = `${API_BASE}/devices/${currentDevice.id}`;
+        const deviceUrl = `/api/devices/${currentDevice.id}`;
         const deviceRes = await fetch(deviceUrl, {
           method: "PUT",
-          mode: "cors",
           headers: {
             "Content-Type": "application/json",
-            Accept: "application/json",
           },
           body: JSON.stringify(devicePayload),
         });
@@ -524,24 +518,6 @@ export default function Settings() {
             </div>
 
             <Separator />
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Connectivity</h3>
-              <div className="grid gap-2">
-                <Label htmlFor="wifi-network">WiFi Network</Label>
-                <div className="flex items-center gap-2">
-                  <Wifi className="h-4 w-4 text-green-500" />
-                  <span>Connected to "Home Network"</span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full md:w-auto"
-                >
-                  Change WiFi Network
-                </Button>
-              </div>
-            </div>
           </CardContent>
           <CardFooter>
             <Button
