@@ -34,14 +34,9 @@ bool ECE140_WIFI::connectToWPAEnterprise(const char* ssid, const char* username,
   esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)username, strlen(username));
   esp_wifi_sta_wpa2_ent_set_username((uint8_t *)username, strlen(username));
   esp_wifi_sta_wpa2_ent_set_password((uint8_t *)password, strlen(password));
-  
-  // For some enterprise networks, an anonymous identity is required.
-  // If connection fails, you might need to uncomment the line below.
-  // esp_wifi_sta_wpa2_ent_set_anonymous_identity((uint8_t *)"anonymous", 9);
 
-  esp_wpa2_config_t config = WPA2_CONFIG_INIT_DEFAULT();
-  esp_wifi_sta_wpa2_ent_enable(&config);
 
+  esp_wifi_sta_wpa2_ent_enable(); 
   WiFi.begin(ssid);
 
   unsigned long startTime = millis();
