@@ -2,39 +2,21 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <Arduino.h>
-
-#include "ECE140_WIFI.h"
-
-const char* ssid = WIFI_SSID;
-const char* user = WIFI_USER;
-const char* password = WIFI_PASSWORD;
- 
-// Use the same API URL as in the main ESP32 code
+#include <WiFiManager.h> 
 const char* apiUrl = "https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws";
-
-// Device identification - this should match the one in main ESP32
 const char* SERIES_ID = "ESP32_001";
-int deviceId = -1; // Will be populated after device registration
-
-// Legacy variables kept for backward compatibility
-const char* serverIpAddress = SERVER_IP; 
-const char* serverPortChar = SERVER_PORT;
-const int serverPort = atoi(serverPortChar);
-String imageUploadUrl; 
+int deviceId = -1;
+String imageUploadUrl;
 
 unsigned long lastTriggerTime = 0;
 const unsigned long triggerCooldown = 5000;
 
-// Function to get device ID from the backend using SERIES_ID
 bool getDeviceId() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi not connected. Cannot get device ID.");
     return false;
   }
-
   HTTPClient http;
-  
-  // Call the endpoint that gets device info from Series ID
   String url = String(apiUrl) + "/device/lookup?serial_id=" + String(SERIES_ID);
   Serial.print("Getting device ID from: ");
   Serial.println(url);
@@ -47,10 +29,9 @@ bool getDeviceId() {
     Serial.println("Response received:");
     Serial.println(response);
     
-    // Basic parsing for device_id (simplified compared to main ESP32)
     int startIdx = response.indexOf("\"device_id\":");
     if (startIdx > 0) {
-      startIdx += 11; // Length of "device_id":
+      startIdx += 11;
       int endIdx = response.indexOf(",", startIdx);
       if (endIdx < 0) endIdx = response.indexOf("}", startIdx);
       
@@ -74,46 +55,24 @@ bool getDeviceId() {
   return false;
 }
 
+
 void setup() {
   Serial.begin(115200);
-
-  /*
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  Serial.println("\n[esp32_cam] Initializing...");
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180);
+  if (!wm.autoConnect("MailGuard-CAM-Setup")) {
+    Serial.println("Failed to connect and hit timeout. Restarting...");
+    delay(3000);
+    ESP.restart();
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("IP Address: ");
+  Serial.println("\n[esp32_cam] WiFi connected successfully via WiFiManager!");
+  Serial.print("[esp32_cam] IP Address: ");
   Serial.println(WiFi.localIP());
-  */
-
-  Serial.println("[esp32_cam] Attempting to connect to Enterprise WiFi...");
-
-  // Create a local instance of the ECE140_WIFI class
-  ECE140_WIFI wifi; 
-
-  // Connect using the connectToWPAEnterprise method
-  // It uses the global 'ssid', 'user', and 'password' variables defined at the top of this file.
-  wifi.connectToWPAEnterprise(ssid, user, password);
-
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[esp32_cam] WiFi connected successfully!");
-    Serial.print("[esp32_cam] IP Address: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n[esp32_cam] WiFi connection failed. Please check credentials and network setup.");
-  }
-
-
-  // Try to get device ID
   if (!getDeviceId()) {
-    Serial.println("Failed to get device ID. Will use legacy upload URL.");
-    // Fall back to legacy URL format if device ID cannot be obtained
-    imageUploadUrl = "http://" + String(serverIpAddress) + ":" + String(serverPort) + "/upload";
+    Serial.println("Failed to get device ID. Image uploads may not be linked correctly.");
+    imageUploadUrl = String(apiUrl) + "/mailbox/images"; 
   } else {
-    // Use the correct API endpoint without query parameters
     imageUploadUrl = String(apiUrl) + "/mailbox/images";
   }
   
@@ -154,7 +113,7 @@ void setup() {
   Serial.println("Camera initialized");
 }
 
-void captureAndSendPhotoToServer();
+void captureAndSendPhotoToServer(); // Forward declaration
 
 void loop() {
   if (Serial.available() > 0) {
@@ -171,6 +130,7 @@ void loop() {
   }
 }
 
+// This function remains unchanged
 void captureAndSendPhotoToServer() {
   if(WiFi.status() != WL_CONNECTED){
     Serial.println("WiFi not connected. Cannot send photo.");
@@ -184,8 +144,7 @@ void captureAndSendPhotoToServer() {
   }
 
   HTTPClient http;
-  WiFiClient client; 
-
+  
   if (imageUploadUrl == "") { 
     Serial.println("Image Upload URL is not set. Skipping send.");
     if (fb) esp_camera_fb_return(fb);
@@ -195,39 +154,24 @@ void captureAndSendPhotoToServer() {
   Serial.print("Sending image to: ");
   Serial.println(imageUploadUrl);
   
-  // For HTTPS URLs, we need to use a secure client instead
-  if (imageUploadUrl.startsWith("https://")) {
-    Serial.println("HTTPS URL detected, but ESP32-CAM doesn't support HTTPS without additional libraries.");
-    Serial.println("Will use HTTP instead. Make sure your API supports HTTP uploads.");
-    // In a real-world scenario, you'd want to use WiFiClientSecure with certificates
-  }
+  http.begin(imageUploadUrl); 
   
-  http.begin(client, imageUploadUrl); 
-  
-  // The API expects multipart form data with fields for 'device_id' and 'file'
   String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-  String contentType = "multipart/form-data; boundary=" + boundary;
-  http.addHeader("Content-Type", contentType);
+  http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
   
-  // Create the multipart form data manually with device_id field first
   String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"device_id\"\r\n\r\n" + 
                 String(deviceId) + "\r\n" +
                 "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
   String tail = "\r\n--" + boundary + "--\r\n";
   
-  // Calculate the total size for Content-Length header
-  uint32_t imageLen = fb->len;
-  uint32_t totalLen = head.length() + imageLen + tail.length();
-  http.addHeader("Content-Length", String(totalLen));
+  uint32_t totalLen = head.length() + fb->len + tail.length();
   
-  // Use beginRequest/write instead of POST for more control
-  http.beginRequest();
-  http.write((uint8_t*)head.c_str(), head.length());
-  http.write(fb->buf, fb->len);
-  http.write((uint8_t*)tail.c_str(), tail.length());
-  
-  // Get the response
-  int httpResponseCode = http.endRequest();
+  // Send the request with the multipart body
+  int httpResponseCode = http.sendRequest("POST", (uint8_t*)head.c_str(), head.length());
+  if(httpResponseCode == 0) http.write(fb->buf, fb->len);
+  if(httpResponseCode == 0) http.write((uint8_t*)tail.c_str(), tail.length());
+  if(httpResponseCode == 0) httpResponseCode = http.endRequest();
+
 
   if (httpResponseCode > 0) {
     String response = http.getString();

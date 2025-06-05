@@ -1,58 +1,62 @@
 #include "ECE140_WIFI.h"
+#include <lwip/dns.h>
 
 ECE140_WIFI::ECE140_WIFI() {
-    Serial.println("[ECE140_WIFI] Initialized");
+  Serial.println("[ECE140_WIFI] Initialized");
 }
 
-bool ECE140_WIFI::connectToWiFi(String ssid, String password, unsigned long timeout_ms) { // 
-  Serial.println("[WiFi] Connecting to WiFi...");
-  WiFi.begin(ssid.c_str(), password.c_str());
+bool ECE140_WIFI::connectToWiFi(const char* ssid, const char* password, unsigned long timeout_ms) {
+  Serial.print("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
 
   unsigned long startTime = millis();
   while (WiFi.status() != WL_CONNECTED) {
     if (millis() - startTime > timeout_ms) {
-      Serial.println("\n[WiFi] Connection timed out.");
+      Serial.println("\n[Error] Connection timed out.");
       WiFi.disconnect();
       return false;
     }
-    delay(500);
     Serial.print(".");
+    delay(500);
   }
 
-  Serial.println("\n[WiFi] Connected to WiFi.");
+  Serial.println("\nSuccessfully connected to WiFi.");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
   return true;
 }
 
-bool ECE140_WIFI::connectToWPAEnterprise(String ssid, String username, String password, unsigned long timeout_ms) { // 
-  Serial.println("[WiFi] Connecting to WPA Enterprise...");
-
+bool ECE140_WIFI::connectToWPAEnterprise(const char* ssid, const char* username, const char* password, unsigned long timeout_ms) {
+  Serial.print("Connecting to WPA2-Enterprise...");
+  
   WiFi.disconnect(true);
   WiFi.mode(WIFI_STA);
+  esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)username, strlen(username));
+  esp_wifi_sta_wpa2_ent_set_username((uint8_t *)username, strlen(username));
+  esp_wifi_sta_wpa2_ent_set_password((uint8_t *)password, strlen(password));
+  
+  // For some enterprise networks, an anonymous identity is required.
+  // If connection fails, you might need to uncomment the line below.
+  // esp_wifi_sta_wpa2_ent_set_anonymous_identity((uint8_t *)"anonymous", 9);
 
-  esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)username.c_str(), username.length());
-  esp_wifi_sta_wpa2_ent_set_username((uint8_t *)username.c_str(), username.length());
-  esp_wifi_sta_wpa2_ent_set_password((uint8_t *)password.c_str(), password.length());
+  esp_wpa2_config_t config = WPA2_CONFIG_INIT_DEFAULT();
+  esp_wifi_sta_wpa2_ent_enable(&config);
 
-  esp_wifi_sta_wpa2_ent_enable();
-
-  WiFi.begin(ssid.c_str());
+  WiFi.begin(ssid);
 
   unsigned long startTime = millis();
-  Serial.print("Waiting for connection...");
   while (WiFi.status() != WL_CONNECTED) {
     if (millis() - startTime > timeout_ms) {
-      Serial.println("\n[WiFi] Enterprise Connection timed out.");
+      Serial.println("\n[Error] Enterprise Connection timed out.");
       WiFi.disconnect();
       return false;
     }
-    delay(500);
     Serial.print(".");
+    delay(500);
   }
-  Serial.println("\n[WiFi] Connected to WPA Enterprise successfully!");
 
-  ip_addr_t dnsserver;
-  IP_ADDR4(&dnsserver, 8, 8, 8, 8);
-  dns_setserver(0, &dnsserver);
-
+  Serial.println("\nSuccessfully connected to WPA2-Enterprise.");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
   return true;
 }
