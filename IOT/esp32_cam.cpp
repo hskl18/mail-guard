@@ -3,6 +3,8 @@
 #include <HTTPClient.h>
 #include <Arduino.h>
 
+#include "ECE140_WIFI.h"
+
 const char* ssid = WIFI_SSID;
 const char* user = WIFI_USER;
 const char* password = WIFI_PASSWORD;
@@ -75,6 +77,7 @@ bool getDeviceId() {
 void setup() {
   Serial.begin(115200);
 
+  /*
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -84,6 +87,25 @@ void setup() {
   Serial.println("WiFi connected");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
+  */
+
+  Serial.println("[esp32_cam] Attempting to connect to Enterprise WiFi...");
+
+  // Create a local instance of the ECE140_WIFI class
+  ECE140_WIFI wifi; 
+
+  // Connect using the connectToWPAEnterprise method
+  // It uses the global 'ssid', 'user', and 'password' variables defined at the top of this file.
+  wifi.connectToWPAEnterprise(ssid, user, password);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[esp32_cam] WiFi connected successfully!");
+    Serial.print("[esp32_cam] IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n[esp32_cam] WiFi connection failed. Please check credentials and network setup.");
+  }
+
 
   // Try to get device ID
   if (!getDeviceId()) {

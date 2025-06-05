@@ -3,13 +3,15 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include "ECE140_WIFI.h"
 
+const char* ucsdUsername = WIFI_USER;
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
  
 // Device identification
 const char* SERIES_ID = "ESP32_001"; // Update this with your device's unique serial ID
-const char* apiUrl = "https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws"; 
+const char* apiUrl = "https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws";
 
 // These will be populated after device registration/authentication
 int deviceId = -1;
@@ -152,6 +154,7 @@ void reportDeviceHealth() {
   http.end();
 }
 
+/*
 void connectToWiFi() {
   Serial.print("Connecting to WiFi: ");
   Serial.println(ssid);
@@ -168,6 +171,25 @@ void connectToWiFi() {
     Serial.println(WiFi.localIP());
   } else {
     Serial.println("\nFailed to connect to WiFi. Will retry later.");
+  }
+}
+*/
+
+void connectToWiFi() {
+  // Create a local instance of the ECE140_WIFI class.
+  ECE140_WIFI wifi;
+
+  // Call the enterprise connection method using the local object.
+  // The ECE140_WIFI class will handle the connection logic and serial output.
+  wifi.connectToWPAEnterprise(ssid, ucsdUsername, password);
+
+  // Check the final status for logging purposes in the main file.
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[main] WiFi connection successful.");
+    Serial.print("[main] IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n[main] WiFi connection failed. Please check credentials and network.");
   }
 }
 
