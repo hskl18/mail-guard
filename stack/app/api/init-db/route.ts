@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
           serial_number VARCHAR(255) NOT NULL UNIQUE,
           device_model VARCHAR(100) DEFAULT 'mailbox_monitor_v1',
           manufactured_date DATE,
-          is_valid BOOLEAN DEFAULT TRUE,
-          is_claimed BOOLEAN DEFAULT FALSE,
+          is_valid TINYINT(1) DEFAULT 1,
+          is_claimed TINYINT(1) DEFAULT 0,
           claimed_by_clerk_id VARCHAR(255),
           claimed_at DATETIME,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
           firmware_version VARCHAR(50),
           battery_level INT,
           signal_strength INT,
-          is_online BOOLEAN DEFAULT FALSE,
+          is_online TINYINT(1) DEFAULT 0,
           device_type VARCHAR(50) DEFAULT 'mailbox_monitor',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -76,20 +76,20 @@ export async function POST(request: NextRequest) {
           name VARCHAR(255) NOT NULL,
           serial_number VARCHAR(255) UNIQUE,
           location VARCHAR(255),
-          is_active BOOLEAN DEFAULT TRUE,
+          is_active TINYINT(1) DEFAULT 1,
           last_seen DATETIME,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          mail_delivered_notify BOOLEAN DEFAULT TRUE,
-          mailbox_opened_notify BOOLEAN DEFAULT TRUE,
-          mail_removed_notify BOOLEAN DEFAULT TRUE,
-          battery_low_notify BOOLEAN DEFAULT TRUE,
-          push_notifications BOOLEAN DEFAULT TRUE,
-          email_notifications BOOLEAN DEFAULT TRUE,
+          mail_delivered_notify TINYINT(1) DEFAULT 1,
+          mailbox_opened_notify TINYINT(1) DEFAULT 1,
+          mail_removed_notify TINYINT(1) DEFAULT 1,
+          battery_low_notify TINYINT(1) DEFAULT 1,
+          push_notifications TINYINT(1) DEFAULT 1,
+          email_notifications TINYINT(1) DEFAULT 1,
           check_interval INT DEFAULT 30,
           battery_threshold INT DEFAULT 20,
-          capture_image_on_open BOOLEAN DEFAULT TRUE,
-          capture_image_on_delivery BOOLEAN DEFAULT TRUE,
+          capture_image_on_open TINYINT(1) DEFAULT 1,
+          capture_image_on_delivery TINYINT(1) DEFAULT 1,
           INDEX idx_clerk_id (clerk_id),
           INDEX idx_serial_number (serial_number),
           INDEX idx_is_active (is_active),
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         CREATE TABLE IF NOT EXISTS events (
           id INT AUTO_INCREMENT PRIMARY KEY,
           device_id INT NOT NULL,
-          event_type ENUM('open', 'close', 'delivery', 'removal') NOT NULL,
+          event_type VARCHAR(50) NOT NULL,
           occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           clerk_id VARCHAR(255),
           INDEX idx_device_id (device_id),
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
           notification_type VARCHAR(100) NOT NULL,
           message TEXT,
           sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          is_read BOOLEAN DEFAULT FALSE,
+          is_read TINYINT(1) DEFAULT 0,
           INDEX idx_device_id (device_id),
           INDEX idx_sent_at (sent_at),
           INDEX idx_is_read (is_read),
@@ -212,8 +212,8 @@ export async function POST(request: NextRequest) {
         CREATE TABLE IF NOT EXISTS iot_events (
           id INT AUTO_INCREMENT PRIMARY KEY,
           serial_number VARCHAR(255) NOT NULL,
-          event_type ENUM('open', 'close', 'delivery', 'removal') NOT NULL,
-          event_data JSON,
+          event_type VARCHAR(50) NOT NULL,
+          event_data TEXT,
           occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_serial_number (serial_number),
           INDEX idx_event_type (event_type),
@@ -282,13 +282,13 @@ export async function POST(request: NextRequest) {
       if (deviceCount[0].count === 0) {
         await executeQuery(`
           INSERT INTO devices (clerk_id, email, name, serial_number, location, is_active) VALUES 
-          ('sample_user_1', 'sample@example.com', 'Sample Mailbox', 'SN001234567', 'Main Lobby', TRUE)
+          ('sample_user_1', 'sample@example.com', 'Sample Mailbox', 'SN001234567', 'Main Lobby', 1)
         `);
 
         // Mark this serial as claimed
         await executeQuery(`
           UPDATE device_serials 
-          SET is_claimed = TRUE, claimed_by_clerk_id = 'sample_user_1', claimed_at = CURRENT_TIMESTAMP
+          SET is_claimed = 1, claimed_by_clerk_id = 'sample_user_1', claimed_at = NOW()
           WHERE serial_number = 'SN001234567'
         `);
 
