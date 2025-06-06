@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = 'https://mail-guard-ten.vercel.app/api'
+BASE_URL = 'http://localhost:3000/api'
 TEST_CONFIG = {
     'valid_serial_number': 'SN001234567',
     'invalid_serial_number': 'INVALID-SERIAL-123',

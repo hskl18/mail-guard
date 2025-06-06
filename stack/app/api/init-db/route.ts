@@ -217,8 +217,7 @@ export async function POST(request: NextRequest) {
           occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_serial_number (serial_number),
           INDEX idx_event_type (event_type),
-          INDEX idx_occurred_at (occurred_at),
-          FOREIGN KEY (serial_number) REFERENCES device_serials(serial_number) ON DELETE CASCADE
+          INDEX idx_occurred_at (occurred_at)
         )
       `);
       results.push("✅ IoT events table created/verified");
@@ -242,8 +241,7 @@ export async function POST(request: NextRequest) {
           file_size INT,
           INDEX idx_serial_number (serial_number),
           INDEX idx_event_type (event_type),
-          INDEX idx_captured_at (captured_at),
-          FOREIGN KEY (serial_number) REFERENCES device_serials(serial_number) ON DELETE CASCADE
+          INDEX idx_captured_at (captured_at)
         )
       `);
       results.push("✅ IoT images table created/verified");

@@ -5,6 +5,16 @@ import { uploadToS3 } from "@/lib/s3";
 // POST /api/iot/upload - Upload image from IoT device
 export async function POST(request: NextRequest) {
   try {
+    // Check content type first
+    const contentType = request.headers.get("content-type") || "";
+
+    if (!contentType.includes("multipart/form-data")) {
+      return NextResponse.json(
+        { error: "Image file is required" },
+        { status: 400 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const serialNumber = formData.get("serial_number") as string;
@@ -107,8 +117,8 @@ export async function POST(request: NextRequest) {
 
         imageRecord = await executeQuery(
           `INSERT INTO images (device_id, image_url, captured_at, event_id) 
-           VALUES (?, ?, ?, ?)`,
-          [deviceId, s3Url, capturedAt, eventId]
+           VALUES (?, ?, NOW(), ?)`,
+          [deviceId, s3Url, eventId]
         );
 
         return NextResponse.json(
@@ -128,8 +138,8 @@ export async function POST(request: NextRequest) {
         // Store in IoT-specific images table (already created in init-db)
         imageRecord = await executeQuery(
           `INSERT INTO iot_images (serial_number, image_url, event_type, captured_at, file_size) 
-           VALUES (?, ?, ?, ?, ?)`,
-          [serialNumber, s3Url, eventType, capturedAt, file.size]
+           VALUES (?, ?, ?, NOW(), ?)`,
+          [serialNumber, s3Url, eventType, file.size]
         );
 
         return NextResponse.json(
@@ -194,53 +204,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Device not found" }, { status: 404 });
     }
 
-    // Try to get images from main images table first (if claimed)
-    let dashboardQuery = `
-      SELECT i.*, d.name as device_name, e.event_type as related_event
-      FROM images i 
-      LEFT JOIN devices d ON i.device_id = d.id 
-      LEFT JOIN events e ON i.event_id = e.id
-      WHERE d.serial_number = ?
-    `;
-    const dashboardParams = [serialNumber];
-
-    if (eventType) {
-      dashboardQuery += " AND e.event_type = ?";
-      dashboardParams.push(eventType);
-    }
-
-    dashboardQuery += " ORDER BY i.captured_at DESC LIMIT ?";
-    dashboardParams.push(limit.toString());
-
-    const dashboardImages = await executeQuery<any[]>(
-      dashboardQuery,
-      dashboardParams
-    );
-
-    // Also get IoT-specific images if they exist
+    // Simplified - get IoT-specific images only
     let iotQuery = `
       SELECT * FROM iot_images 
       WHERE serial_number = ?
     `;
-    const iotParams = [serialNumber];
 
     if (eventType) {
-      iotQuery += " AND event_type = ?";
-      iotParams.push(eventType);
+      iotQuery += ` AND event_type = '${eventType}'`;
     }
 
-    iotQuery += " ORDER BY captured_at DESC LIMIT ?";
-    iotParams.push(limit.toString());
+    iotQuery += ` ORDER BY captured_at DESC LIMIT ${limit}`;
 
-    const iotImages = await executeQuery<any[]>(iotQuery, iotParams);
+    const iotImages = await executeQuery<any[]>(iotQuery, [serialNumber]);
 
     return NextResponse.json({
       serial_number: serialNumber,
       is_claimed: deviceSerial[0].is_claimed,
       device_model: deviceSerial[0].device_model,
-      dashboard_images: dashboardImages,
       iot_images: iotImages,
-      total_images: dashboardImages.length + iotImages.length,
+      total_images: iotImages.length,
       filters: {
         event_type: eventType,
         limit: limit,

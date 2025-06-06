@@ -74,9 +74,9 @@ export async function POST(request: NextRequest) {
              is_online = 1
          WHERE serial_number = ?`,
         [
-          firmware_version || existingStatus[0].firmware_version,
-          battery_level,
-          signal_strength,
+          firmware_version || existingStatus[0].firmware_version || "1.0.0",
+          battery_level ?? null,
+          signal_strength ?? null,
           serial_number,
         ]
       );
@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
         [
           serial_number,
           firmware_version || "1.0.0",
-          battery_level,
-          signal_strength,
+          battery_level ?? null,
+          signal_strength ?? null,
         ]
       );
     }
@@ -139,15 +139,12 @@ export async function POST(request: NextRequest) {
       clerkId = dashboardDevice[0].clerk_id;
     }
 
-    // Create event record
-    const eventTimestamp = timestamp || new Date().toISOString();
-
     if (deviceId && clerkId) {
       // Store in events table if device is claimed and linked to dashboard
       const eventResult = await executeQuery(
         `INSERT INTO events (device_id, event_type, clerk_id, occurred_at) 
-         VALUES (?, ?, ?, ?)`,
-        [deviceId, standardEventType, clerkId, eventTimestamp]
+         VALUES (?, ?, ?, NOW())`,
+        [deviceId, standardEventType, clerkId]
       );
 
       // Store health data if provided
@@ -155,7 +152,13 @@ export async function POST(request: NextRequest) {
         await executeQuery(
           `INSERT INTO device_health (device_id, clerk_id, battery_level, signal_strength, firmware_version, reported_at)
            VALUES (?, ?, ?, ?, ?, NOW())`,
-          [deviceId, clerkId, battery_level, signal_strength, firmware_version]
+          [
+            deviceId,
+            clerkId,
+            battery_level ?? null,
+            signal_strength ?? null,
+            firmware_version ?? null,
+          ]
         );
       }
 
@@ -187,13 +190,8 @@ export async function POST(request: NextRequest) {
       // Store in IoT events table if device is not claimed or not linked
       const iotEventResult = await executeQuery(
         `INSERT INTO iot_events (serial_number, event_type, event_data, occurred_at) 
-         VALUES (?, ?, ?, ?)`,
-        [
-          serial_number,
-          standardEventType,
-          JSON.stringify(event_data),
-          eventTimestamp,
-        ]
+         VALUES (?, ?, ?, NOW())`,
+        [serial_number, standardEventType, JSON.stringify(event_data)]
       );
 
       return NextResponse.json({
@@ -242,29 +240,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Device not found" }, { status: 404 });
     }
 
-    // Try to get events from main events table first (if claimed)
-    const dashboardEvents = await executeQuery<any[]>(
-      `SELECT e.*, d.name as device_name 
-       FROM events e 
-       LEFT JOIN devices d ON e.device_id = d.id 
-       WHERE d.serial_number = ?
-       ORDER BY e.occurred_at DESC 
-       LIMIT ?`,
-      [serialNumber, limit]
-    );
-
-    // Also get IoT-specific events
+    // Simplified - get IoT-specific events only
     const iotEvents = await executeQuery<any[]>(
       `SELECT * FROM iot_events 
        WHERE serial_number = ? 
        ORDER BY occurred_at DESC 
-       LIMIT ?`,
-      [serialNumber, limit]
-    );
-
-    // Get device status
-    const deviceStatus = await executeQuery<any[]>(
-      "SELECT * FROM iot_device_status WHERE serial_number = ?",
+       LIMIT ${limit}`,
       [serialNumber]
     );
 
@@ -272,10 +253,8 @@ export async function GET(request: NextRequest) {
       serial_number: serialNumber,
       is_claimed: deviceSerial[0].is_claimed,
       device_model: deviceSerial[0].device_model,
-      dashboard_events: dashboardEvents,
       iot_events: iotEvents,
-      total_events: dashboardEvents.length + iotEvents.length,
-      device_status: deviceStatus.length > 0 ? deviceStatus[0] : null,
+      total_events: iotEvents.length,
     });
   } catch (error) {
     console.error("IoT get events error:", error);

@@ -21,16 +21,124 @@ __pycache__/
 venv/
 ENV/
 env/
-
-# Pytest
+*.egg-info
 .pytest_cache/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Package manager lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Next.js (anywhere in repo)
+**/.next/
+**/out/
+**/.next
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# AWS CDK
+.cdk.staging/
+cdk.out/
+**/cdk.out/
+
+# Docker
+docker-compose.override.yml
+
+# Vercel
+.vercel/
+
+# AWS
+.aws/
+
+# Clerk
+.clerk/
+**/.clerk/
+
+# Testing
+coverage/
+.coverage
+coverage.xml
+htmlcov/
+
+# Cache directories
+.cache/
+.tmp/
+**/.cache/
+
+# Certificates
+**/certs/
+!backend/certs/
+!backend/certs/**
+
+# API Test outputs
+**/testoutput.txt
+
+# Development artifacts
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
+
+# Logs everywhere
+**/*.log
+logs/
+**/logs/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# ESLint cache
+.eslintcache
+
+# Webpack
+.webpack/
+
+# Service worker
+sw.js
+sw.js.map
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # Backend virtual environments (if any)
 backend/.venv/
 backend/venv/
 
 # Node dependencies
-node_modules/
 frontend/node_modules/
 
 # Next.js build output
@@ -135,3 +243,5 @@ venv/
 !certs/
 !backend/certs/
 !backend/certs/**
+
+.next/
