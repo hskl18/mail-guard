@@ -67,20 +67,25 @@ export async function POST(request: NextRequest) {
       // Update existing status
       await executeQuery(
         `UPDATE iot_device_status 
-         SET last_seen = CURRENT_TIMESTAMP, 
-             firmware_version = COALESCE(?, firmware_version),
-             battery_level = COALESCE(?, battery_level),
-             signal_strength = COALESCE(?, signal_strength),
-             is_online = TRUE
+         SET last_seen = NOW(), 
+             firmware_version = ?,
+             battery_level = ?,
+             signal_strength = ?,
+             is_online = 1
          WHERE serial_number = ?`,
-        [firmware_version, battery_level, signal_strength, serial_number]
+        [
+          firmware_version || existingStatus[0].firmware_version,
+          battery_level,
+          signal_strength,
+          serial_number,
+        ]
       );
     } else {
       // Create new status record
       await executeQuery(
         `INSERT INTO iot_device_status 
          (serial_number, firmware_version, battery_level, signal_strength, is_online, last_seen) 
-         VALUES (?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP)`,
+         VALUES (?, ?, ?, ?, 1, NOW())`,
         [
           serial_number,
           firmware_version || "1.0.0",
@@ -149,7 +154,7 @@ export async function POST(request: NextRequest) {
       if (battery_level !== undefined || signal_strength !== undefined) {
         await executeQuery(
           `INSERT INTO device_health (device_id, clerk_id, battery_level, signal_strength, firmware_version, reported_at)
-           VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+           VALUES (?, ?, ?, ?, ?, NOW())`,
           [deviceId, clerkId, battery_level, signal_strength, firmware_version]
         );
       }
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
       if (standardEventType === "open" || standardEventType === "delivery") {
         await executeQuery(
           `INSERT INTO notifications (device_id, notification_type, message, sent_at)
-           VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+           VALUES (?, ?, ?, NOW())`,
           [
             deviceId,
             `mailbox_${standardEventType}`,

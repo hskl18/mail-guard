@@ -43,17 +43,23 @@ export async function POST(request: NextRequest) {
       // Update existing status
       await executeQuery(
         `UPDATE iot_device_status 
-         SET last_seen = CURRENT_TIMESTAMP, firmware_version = COALESCE(?, firmware_version),
-             is_online = TRUE, device_type = COALESCE(?, device_type)
+         SET last_seen = NOW(), 
+             firmware_version = ?,
+             is_online = 1, 
+             device_type = ?
          WHERE serial_number = ?`,
-        [firmware_version, device_type, serial_number]
+        [
+          firmware_version || existingStatus[0].firmware_version,
+          device_type || existingStatus[0].device_type,
+          serial_number,
+        ]
       );
     } else {
       // Create new status record
       await executeQuery(
         `INSERT INTO iot_device_status 
          (serial_number, firmware_version, device_type, is_online, last_seen) 
-         VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP)`,
+         VALUES (?, ?, ?, 1, NOW())`,
         [
           serial_number,
           firmware_version || "1.0.0",

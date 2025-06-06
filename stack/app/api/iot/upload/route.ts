@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     // Update device status
     await executeQuery(
       `UPDATE iot_device_status 
-       SET last_seen = CURRENT_TIMESTAMP, is_online = TRUE
+       SET last_seen = NOW(), is_online = 1
        WHERE serial_number = ?`,
       [serialNumber]
     );
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         const recentEvent = await executeQuery<any[]>(
           `SELECT id FROM events 
            WHERE device_id = ? AND event_type = ? 
-           AND occurred_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+           AND occurred_at >= NOW() - INTERVAL 5 MINUTE
            ORDER BY occurred_at DESC LIMIT 1`,
           [deviceId, eventType]
         );
