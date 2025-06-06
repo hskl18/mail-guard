@@ -206,6 +206,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create iot_events table for unclaimed device events
+    try {
+      await executeQuery(`
+        CREATE TABLE IF NOT EXISTS iot_events (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          serial_number VARCHAR(255) NOT NULL,
+          event_type ENUM('open', 'close', 'delivery', 'removal') NOT NULL,
+          event_data JSON,
+          occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_serial_number (serial_number),
+          INDEX idx_event_type (event_type),
+          INDEX idx_occurred_at (occurred_at),
+          FOREIGN KEY (serial_number) REFERENCES device_serials(serial_number) ON DELETE CASCADE
+        )
+      `);
+      results.push("✅ IoT events table created/verified");
+    } catch (error) {
+      errors.push(
+        `❌ IoT events table: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
+    // Create iot_images table for unclaimed device images
+    try {
+      await executeQuery(`
+        CREATE TABLE IF NOT EXISTS iot_images (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          serial_number VARCHAR(255) NOT NULL,
+          image_url VARCHAR(500) NOT NULL,
+          event_type VARCHAR(50),
+          captured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          file_size INT,
+          INDEX idx_serial_number (serial_number),
+          INDEX idx_event_type (event_type),
+          INDEX idx_captured_at (captured_at),
+          FOREIGN KEY (serial_number) REFERENCES device_serials(serial_number) ON DELETE CASCADE
+        )
+      `);
+      results.push("✅ IoT images table created/verified");
+    } catch (error) {
+      errors.push(
+        `❌ IoT images table: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
     // Insert sample data if tables are empty
     try {
       const serialCount = await executeQuery<any[]>(
@@ -219,7 +268,8 @@ export async function POST(request: NextRequest) {
           ('SN001234568', 'mailbox_monitor_v1', '2024-01-01'),
           ('SN001234569', 'mailbox_monitor_v1', '2024-01-01'),
           ('SN001234570', 'mailbox_monitor_v2', '2024-01-15'),
-          ('SN001234571', 'mailbox_monitor_v2', '2024-01-15')
+          ('SN001234571', 'mailbox_monitor_v2', '2024-01-15'),
+          ('TEST-DEVICE-001', 'mailbox_monitor_v1', '2024-01-01')
         `);
         results.push("✅ Sample serial numbers inserted");
       } else {
