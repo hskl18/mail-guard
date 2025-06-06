@@ -34,9 +34,8 @@ bool ECE140_WIFI::connectToWPAEnterprise(const char* ssid, const char* username,
   esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)username, strlen(username));
   esp_wifi_sta_wpa2_ent_set_username((uint8_t *)username, strlen(username));
   esp_wifi_sta_wpa2_ent_set_password((uint8_t *)password, strlen(password));
-
-
   esp_wifi_sta_wpa2_ent_enable(); 
+
   WiFi.begin(ssid);
 
   unsigned long startTime = millis();
