@@ -3,22 +3,22 @@
 #include <HTTPClient.h>
 #include <Arduino.h>
 #include <WiFiManager.h> 
-const char* apiUrl = "https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws";
-const char* SERIES_ID = "ESP32_001";
+const char* apiUrl = "https://mail-guard-ten.vercel.app/api";
+const char* SERIES_ID = "SN001234567";  // Use the test device serial we've been using
 int deviceId = -1;
 String imageUploadUrl;
 
 unsigned long lastTriggerTime = 0;
 const unsigned long triggerCooldown = 5000;
 
-bool getDeviceId() {
+bool activateDevice() {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi not connected. Cannot get device ID.");
+    Serial.println("WiFi not connected. Cannot activate device.");
     return false;
   }
   HTTPClient http;
-  String url = String(apiUrl) + "/device/lookup?serial_id=" + String(SERIES_ID);
-  Serial.print("Getting device ID from: ");
+  String url = String(apiUrl) + "/iot/activate?serial_number=" + String(SERIES_ID);
+  Serial.print("Activating device at: ");
   Serial.println(url);
   
   http.begin(url);
@@ -26,29 +26,20 @@ bool getDeviceId() {
   
   if (httpResponseCode == 200) {
     String response = http.getString();
-    Serial.println("Response received:");
+    Serial.println("Device activation response:");
     Serial.println(response);
     
-    int startIdx = response.indexOf("\"device_id\":");
-    if (startIdx > 0) {
-      startIdx += 11;
-      int endIdx = response.indexOf(",", startIdx);
-      if (endIdx < 0) endIdx = response.indexOf("}", startIdx);
-      
-      if (endIdx > startIdx) {
-        String deviceIdStr = response.substring(startIdx, endIdx);
-        deviceIdStr.trim();
-        deviceId = deviceIdStr.toInt();
-        
-        Serial.print("Device ID: ");
-        Serial.println(deviceId);
-        return true;
-      }
+    // Check if the response contains "valid" status
+    if (response.indexOf("\"status\":\"valid\"") > 0) {
+      Serial.println("Device activated successfully!");
+      return true;
+    } else {
+      Serial.println("Device activation failed - invalid serial number");
     }
-    Serial.println("Failed to parse device_id from response");
   } else {
-    Serial.print("Error getting device ID: ");
+    Serial.print("Error activating device: ");
     Serial.println(httpResponseCode);
+    Serial.println("Response: " + http.getString());
   }
   
   http.end();
@@ -69,12 +60,11 @@ void setup() {
   Serial.println("\n[esp32_cam] WiFi connected successfully via WiFiManager!");
   Serial.print("[esp32_cam] IP Address: ");
   Serial.println(WiFi.localIP());
-  if (!getDeviceId()) {
-    Serial.println("Failed to get device ID. Image uploads may not be linked correctly.");
-    imageUploadUrl = String(apiUrl) + "/mailbox/images"; 
-  } else {
-    imageUploadUrl = String(apiUrl) + "/mailbox/images";
+  if (!activateDevice()) {
+    Serial.println("Failed to activate device. Image uploads may not work correctly.");
   }
+  // Always use the IoT upload endpoint
+  imageUploadUrl = String(apiUrl) + "/iot/upload";
   
   Serial.print("Image Upload URL configured to: ");
   Serial.println(imageUploadUrl);
@@ -159,8 +149,10 @@ void captureAndSendPhotoToServer() {
   String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
   http.addHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
   
-  String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"device_id\"\r\n\r\n" + 
-                String(deviceId) + "\r\n" +
+  String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"serial_number\"\r\n\r\n" + 
+                String(SERIES_ID) + "\r\n" +
+                "--" + boundary + "\r\nContent-Disposition: form-data; name=\"event_type\"\r\n\r\n" + 
+                "delivery" + "\r\n" +
                 "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
   String tail = "\r\n--" + boundary + "--\r\n";
   
