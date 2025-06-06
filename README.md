@@ -1,416 +1,235 @@
-# Proposal: MailGuard Smart Delivery Hub for California University Campuses
+# MailGuard – Smart Cluster Mailbox Monitor
 
-## 1. Executive Summary
+Welcome to **MailGuard**, a smart, IoT-integrated cluster mailbox monitoring system designed to secure and streamline package deliveries in residential communities! This project provides real-time security monitoring, theft prevention, and delivery tracking for cluster mailbox installations. 🚀
 
-MailGuard is launching a Smart Delivery Hub tailored for university environments in California. Our goal is to secure and streamline package and meal deliveries on campus, solving widespread issues of theft and inefficient pickup. The initial prototype is a compact module—a small, battery‑powered box equipped with a magnetic reed switch (door sensor) and an OV2640 camera. When mounted inside a locker or mailbox compartment, it instantly detects access events, captures a photo, and sends data over HTTPS to our cloud backend. This proposal outlines the problem, our solution, prototype details, technical architecture, and a phased implementation plan.
+---
 
-## 2. Problem Statement
+## 🌟 Ideal Product Vision
 
-### 2.1 Rising Theft and Lost Deliveries
+Imagine a cluster mailbox system that doubles as a comprehensive security and delivery management platform. The **ideal MailGuard system** integrates:
 
-- Students living on campus face frequent package and food theft. Dorm hallways and mailrooms often see unattended parcels stolen or misplaced.
-- Food deliveries (Uber Eats, DoorDash) are dropped at common areas, leaving meals vulnerable to theft or spoilage.
+📦 **Real-Time Access Monitoring**  
+📸 **Photo Evidence Capture**  
+🔔 **Instant Delivery Notifications**  
+🌐 **Cloud-Based Management Dashboard**
 
-### 2.2 Inefficient Pickup Process
+All collected data is:
 
-- Traditional mailrooms require staff intervention and have limited hours. Students queue in long lines to retrieve parcels, causing delays and frustration.
-- Lack of real‑time visibility: students don't know when their package arrives or if it was stolen, leading to repeated inquiries with mail staff.
+- 📡 Transmitted via WiFi to cloud backend
+- 💽 Stored in secure MySQL database
+- 📊 Visualized on a modern web dashboard
+- 📱 Delivered through instant email notifications
+- 🛡️ Protected with enterprise-grade authentication
 
-### 2.3 Limited Existing Solutions
+---
 
-- Large locker systems (Amazon Hub, Luxer One, Parcel Pending) are expensive ($10k–$20k per locker bank), require significant installation, and often cater only to packages, not food.
-- Smaller or modular solutions for individual lockers do not exist at an affordable price point, leaving many smaller colleges or dorms unprotected.
+## 🔨 MVP (Minimum Viable Product)
 
-## 3. Proposed Solution
+For this project, our MVP includes:
 
-MailGuard will deliver a scalable, affordable Smart Delivery Hub that:
+### ✅ Hardware
 
-- Secures packages and meals in private compartments (lockers or standard mailboxes).
-- Provides real‑time alerts when a compartment is accessed, with an image log.
-- Integrates seamlessly with campus apps for notifications and user management.
-- Offers a low‑cost, modular design so facilities can deploy one small unit per locker or mailbox, rather than purchasing large locker banks.
+- ESP32-CAM microcontroller with integrated camera
+- Magnetic reed switch for door access detection
 
-### 3.1 Key Features
+### ✅ Software
 
-- **Door Open/Close Detection**: Magnetic reed switch detects when a locker door is opened or closed.
-- **Photo Capture**: OV2640 camera snaps an image at each access event, creating a visual log.
-- **Real‑Time Notifications**: Via email and SMS (through AWS SES/SNS), notifying the student or dorm staff immediately upon delivery or retrieval.
-- **Minimal Installation**: Battery‑powered prototype mounts inside any locker or mailbox compartment with double‑sided tape—no wiring required.
-- **Cloud Backend**: FastAPI running on AWS Lambda, MySQL on RDS storing events, and S3 for images.
-- **User Dashboard**: Next.js frontend (hosted on Vercel) displays event history, snapshots, and device status (including battery level in future iterations).
+- ESP32 sends event data via HTTPS over WiFi
+- Next.js fullstack for frontend and backend
+- Clerk authentication for secure user access
+- Email notifications via MailerSend integration
 
-## 4. Prototype Description
+---
 
-Our v1 prototype is a compact, self‑contained module that fits within a single locker or mailbox compartment:
+## 🧰 Required Technologies
 
-- **Enclosure**: 3D‑printed ABS/PLA plastic box (~3×3×2 inches)
-- **Sensors & Electronics**:
-  - ESP32‑CAM board as the microcontroller and camera.
-  - Magnetic reed switch mounted on the door frame; corresponding magnet on the latch.
-  - Lithium‑ion battery with onboard charger (TP4056), providing several weeks of standby between charges.
-- **Firmware Logic**:
-  1. Boot into deep‑sleep mode.
-  2. On reed switch state change (door open), wake up.
-  3. Capture photo via OV2640, store temporarily in SRAM/flash.
-  4. Connect to campus Wi‑Fi (or a dedicated access point).
-  5. Upload image to S3 via HTTPS POST and send event metadata (device ID, timestamp, event_type) to FastAPI Lambda.
-  6. Return to deep sleep to save power.
-- **Physical Mounting**:
-  - Magnet & Switch attach to locker door and frame.
-  - Module is secured to the interior wall of the compartment with foam tape or small screws.
-- **Early Test Results**:
-  - Detects door open/close reliably (no false triggers).
-  - Camera captures 640×480 JPEG in <300 ms.
-  - Battery life: ~3 weeks with average 10 accesses per day (based on deep‑sleep current draw).
+### 📟 Electronics
 
-This minimal hardware demonstrates the core functionality—security and visibility—before adding secondary sensors (e.g., weight) or multi‑compartment support.
+- ESP32-CAM (OV2640 camera module)
+- Magnetic reed switch + magnet
 
-## 5. Technical Architecture
+### 🌐 Software
+
+- **Backend & Frontend**: Next.js
+- **Database**: MySQL on Aiven RDS
+- **Storage**: AWS S3 for image storage
+- **Authentication**: Clerk for secure user management
+- **Notifications**: MailerSend for email alerts
+- **Deployment**: AWS CDK for infrastructure as code
+
+### 🖧 System Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                     Campus Locker/Mailbox                     │
-│                                                                │
-│   ┌──────────────────┐      ┌────────────────────────────────┐  │
-│   │  MailGuard IoT   │      │   Cloud Backend & Services     │  │
-│   │   Prototype Box  │      │                                │  │
-│   │  ┌────────────┐  │      │  ┌──────────────────────────┐  │  │
-│   │  │Reed Switch │  │      │  │API Gateway (HTTPS)       │  │  │
-│   │  └────────────┘  │      │  └──────────────────────────┘  │  │
-│   │        │         │      │          ↓                     │  │
-│   │        ↓         │      │  ┌──────────────────────────┐  │  │
-│   │  ┌────────────┐  │      │  │ AWS Lambda (FastAPI)     │  │  │
-│   │  │ OV2640     │  │      │  │  • /mailbox/events        │  │  │
-│   │  │ Camera     │  │      │  │  • /mailbox/images        │  │  │
-│   │  └────────────┘  │      │  │  • /mailbox/notifications │  │  │
-│   │        │         │      │  └──────────────────────────┘  │  │
-│   │        ↓         │      │          ↓                     │  │
-│   │  ┌────────────┐  │      │  ┌──────────────────────────┐  │  │
-│   │  │   ESP32    │──┼──Wi‑Fi│  │  Amazon RDS (MySQL)       │  │  │
-│   │  │ Controller │  │      │  │  • devices, events, notifs│  │  │
-│   │  └────────────┘  │      │  └──────────────────────────┘  │  │
-│   │      ││ Battery   │      │          ↓                     │  │
-│   │      ↓│ Backup    │      │  ┌──────────────────────────┐  │  │
-│   │  ┌────────────┐  │      │  │  Amazon S3 (Images)       │  │  │
-│   │  │ Li‑Ion Batt │  │      │  └──────────────────────────┘  │  │
-│   │  └────────────┘  │      │          ↓                     │  │
-│   │                   │      │  ┌──────────────────────────┐  │  │
-│   │  (Deep Sleep)     │      │  │  SES / SNS (Notifications)│  │  │
-│   └──────────────────┘      │  └──────────────────────────┘  │  │
-└────────────────────────────────────────────────────────────────┘
-
-                                 ↓
-                         [Next.js Web Dashboard]
-                       (Vercel | Clerk Authentication)
+[Cluster Mailbox]
+    ↓
+[ESP32-CAM Module]
+├─ Reed Switch (door sensor)
+├─ OV2640 Camera
+├─ Battery System
+    ↓ HTTPS/WiFi
+[Next.js (Fullstack)]
+    ↓
+[Aiven (MySQL)]
+├─ MySQL (events & devices)
+├─ S3 (photo storage)
+└─ MailerSend (notifications)
+    ↓
+[Next.js Dashboard] ← Clerk Auth
 ```
 
-### 5.1 Device Layer
+---
 
-- ESP32‑CAM module: reed switch + OV2640 camera + battery.
-- Deep‑sleep cycles for low power.
+## 🎯 Target Market
 
-### 5.2 Network Layer
+We aim to help two key groups:
 
-- HTTPS calls to API Gateway (or direct Lambda Function URL) for events and image uploads.
-- TLS certificate configured for secure transport.
+1. 🏘️ **Residential Communities & HOAs**  
+   For cluster mailbox security and package theft prevention in neighborhoods and apartment complexes.
 
-### 5.3 Backend Layer
+2. 🏢 **Property Management Companies**  
+   To reduce liability, improve resident satisfaction, and streamline mail/package management across multiple properties.
 
-- **AWS Lambda (FastAPI)**:
-  - /mailbox/events records "door_open" or "door_close" with timestamp.
-  - /mailbox/images accepts multipart/form-data for image upload; returns S3 URL.
-  - /mailbox/notifications stores a notification record and publishes an SNS message.
-- **Amazon RDS (MySQL)**: stores device registrations, event logs, and notification metadata.
-- **Amazon S3**: stores image files; bucket policies restrict access.
-- **Amazon SES / SNS**: sends email and SMS alerts to students or dorm staff.
+---
 
-### 5.4 Frontend Layer
+## 📆 Development Timeline
 
-- Next.js dashboard with Clerk for authentication, displaying:
-  - Real‑time event feed (open/close times).
-  - Image thumbnails and full‑size snapshots.
-  - Device status (battery level, last_seen).
-  - Student view: see only their assigned locker/device.
-  - Staff/Admin view: monitor all hub units on campus, adjust settings, and manage notifications.
+### 🗓️ Phase 1: Prototype Planning & Setup (Weeks 1-4)
 
-## 6. Prototype Capabilities & Limitations
+- **Project Foundation**:
+  - Brainstorm and design the prototype concept
+  - Set up Next.js fullstack application structure
+  - Configure Aiven MySQL database connection
+  - Design basic database schemas for devices and events
 
-### 6.1 Capabilities
+---
 
-- **Event Detection & Logging**
-  - Reed switch accurately triggers on door open/close.
-  - Events timestamped and sent reliably via Wi‑Fi.
-- **Photo Evidence**
-  - OV2640 captures 640×480 JPEG; stored in S3 for immediate review.
-  - Enables audit trail—"who picked up the package?"
-- **Notifications**
-  - Upon event, backend sends email to the student associated with that locker.
-  - SMS notifications can be added for staff escalations or critical alerts.
-- **Low‑Power Operation**
-  - Deep sleep between events reduces average current draw to ~5 mA.
-  - Battery life of ~3 weeks on a single 18650 cell, assuming ~10 accesses/day.
+### 🗓️ Phase 2: Core Prototype Development (Weeks 5-7)
 
-### 6.2 Limitations (v1 Prototype)
+- **Frontend Prototype**:
+  - Build Next.js frontend with Tailwind CSS and shadcn/ui
+  - Implement Clerk authentication system
+  - Create basic event monitoring interface
+- **Backend API**:
+  - Develop Next.js API routes for device events
+  - Implement image upload functionality to S3
+  - Set up MailerSend email notification system
 
-- **Single‑Compartment Focus**
-  - Only monitors one door per module; scaling to multi‑compartment hubs requires adding multiple modules.
-- **No Weight Sensor (Yet)**
-  - Cannot differentiate "package delivered" vs. "student opened empty compartment."
-  - Future versions will integrate a load cell for finer delivery detection.
-- **Basic Authentication**
-  - Prototype relies on device‑ID mapping; full campus directory integration (student IDs, LDAP) is pending.
-- **Wi‑Fi Dependence**
-  - Requires reliable campus Wi‑Fi; black spots or network changes can delay events.
-  - Future builds will support fallback LTE or LoRa connectivity.
+---
 
-## 7. Benefits & Value Proposition
+### 🗓️ Phase 3: Hardware Prototype Integration (Weeks 8-10)
 
-### 7.1 Enhanced Security
+- **ESP32 Prototype Development**:
+  - Develop ESP32-CAM firmware for basic photo capture
+  - Implement reed switch door detection logic
+  - Test battery life and power management
+- **System Integration**:
+  - Connect ESP32 prototype to Next.js backend
+  - Test end-to-end photo capture and notification flow
+  - Validate prototype functionality in controlled environment
 
-- Photo logs deter theft and provide evidence in case of disputes.
-- Real‑time alerts ensure prompt retrieval, minimizing theft window.
+---
 
-### 7.2 Operational Efficiency
+## 🌐 Live Demo
 
-- Automates package tracking; reduces staff time spent searching or relabeling.
-- Students retrieve items on their own schedule, easing mailroom traffic.
+- **Frontend Dashboard**: [https://mail-guard-ten.vercel.app/](https://mail-guard-ten.vercel.app/)
+- **API Documentation**: [https://mail-guard-ten.vercel.app/api](https://mail-guard-ten.vercel.app/api)
 
-### 7.3 Cost‑Effective & Scalable
+---
 
-- Prototype cost ~$80 per module (ESP32‑CAM, battery, reed switch, enclosure).
-- Campuses can deploy by the locker or mailbox—no large locker bank purchase needed.
-- Scales horizontally: add modules as needed rather than replacing entire systems.
+## 📌 Project Status
 
-### 7.4 Improved Student Experience
+> 🔬 Currently in **Prototype Phase** - Building MVP for cluster mailbox security
 
-- 24/7 visibility—no more "Where is my package?" calls.
-- Simple mobile alerts (email/SMS) integrate with student routines.
-- Potential to expand into food security (e.g. meal locker integrations).
+**What's Working:**
 
-## 8. Implementation Plan
+- ✅ Next.js fullstack application with Clerk authentication
+- ✅ MySQL database integration via Aiven
+- ✅ Basic frontend dashboard for monitoring
+- ✅ Email notification system via MailerSend
 
-| Phase                                 | Timeline   | Milestones                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 1: Prototype Build & Validation | Weeks 1–4  | - Finalize prototype hardware: assemble ESP32‑CAM + reed switch + battery in 3D‑printed enclosure<br>- Develop & test firmware: reed + camera logic, HTTPS uploads<br>- Deploy cloud backend (Lambda + RDS + S3 + SES/SNS)<br>- Conduct bench tests (reliability, battery life)                                                                                     |
-| Phase 2: Campus Pilot Deployment      | Weeks 5–8  | - Install 5 prototype modules in a selected campus mailroom or small locker hub<br>- Assign modules to volunteer students; collect feedback on notifications, images, and usability<br>- Monitor network reliability & battery performance<br>- Track key metrics: pickup time reduction, theft incidents averted                                                   |
-| Phase 3: Feedback, Iterate, & Expand  | Weeks 9–12 | - Analyze pilot data; iterate on hardware (e.g., optimize battery, add LED indicators) and firmware (OTA updates, error handling)<br>- Develop multi‑module hub management (grouping devices under one "hub" ID)<br>- Integrate basic campus SSO/Clerk authentication for device registration<br>- Expand pilot to additional dorms or small campus stores          |
-| Phase 4: Full‑Scale Campus Rollout    | Months 4–6 | - Finalize enclosure design for durability (metal or reinforced plastic) and tamper‑resistance<br>- Produce a 20‑unit run for dorms and mailrooms across campus<br>- Develop Next.js dashboard features: bulk device management, usage analytics, multi‑hub reporting<br>- Launch awareness campaign: posters in dorms, orientation events, email blast to students |
+**Currently Developing:**
 
-## 9. Future Roadmap & Extensions
+- 🔧 ESP32-CAM hardware prototype
+- 🔧 Photo capture and upload functionality
+- 🔧 Real-time event monitoring
 
-### 9.1 Weight‑Based Delivery Detection
+Want to follow the prototype development? Star this repo and check back for updates!
 
-- Add a small load cell under the locker shelf. Differentiate "mail delivered" vs. "empty open."
+---
 
-### 9.2 Multi‑Compartment Hubs
+## 🔧 Prototype Setup
 
-- Combine up to eight modules under one backplane with a single Wi‑Fi/LTE bridge, reducing network overhead.
-
-### 9.3 Temperature‑Controlled Compartments
-
-- Offer "food lockers" with passive insulation or active cooling for meal deliveries, addressing campus late‑night food security.
-
-### 9.4 Campus ID Integration
-
-- Work with campus IT (Clerk or LDAP/SSO) to auto‑register students, assign them to specific modules, and unlock via mobile credential.
-
-### 9.5 Analytics & Reporting
-
-- Develop usage dashboards for mailroom staff: peak delivery times, average pickup latency, overall security events.
-
-### 9.6 Networked Locker Zones
-
-- Create a "Campus Locker Network" allowing students to retrieve packages from any participating drop point (e.g. dorms, student union, retail partner on campus).
-
-### 9.7 Monetization Model
-
-- Offer a locker‑as‑service subscription to Universities, with optional per‑use fees for students (e.g. after 48 hours of storage).
-- Explore partnerships with delivery services (Amazon, Postmates) to guarantee drop location availability.
-
-## 10. Conclusion
-
-MailGuard's Smart Delivery Hub—anchored by a compact prototype box with a reed switch and camera—offers an immediate, low‑cost solution for California campuses combatting package and food theft. By delivering real‑time alerts, photo evidence, and a seamless cloud dashboard, we will greatly improve student satisfaction, reduce mailroom burdens, and enhance overall campus security. The implementation plan lays out a clear path from prototype validation to full‑scale rollout. With targeted execution and strategic campus partnerships, MailGuard can become the trusted standard for secure, efficient last‑mile delivery on college campuses across California.
-
-For more information or to participate in the pilot, please contact the MailGuard team at team@mailguard.edu.
-
-# Mail Guard - Smart Mailbox Monitor
-
-A comprehensive IoT solution for monitoring mailboxes and shared delivery hubs. Mail Guard provides real-time notifications, image capture, and secure access tracking for your packages and mail.
-
-## 🌐 Online Demo
-
-- Frontend: [https://mail-guard-ten.vercel.app/](https://mail-guard-ten.vercel.app/)
-- API: [https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws/](https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws/)
-
-## 📋 Overview
-
-Mail Guard is designed to add security to your mailbox and prevent mail theft. The system consists of:
-
-1. Hardware device (ESP32-based) that attaches inside a standard mailbox or delivery locker
-2. Cloud backend API (FastAPI on AWS Lambda)
-3. User-friendly web dashboard (Next.js)
-
-### Features:
-
-- **Real-time monitoring** of mailbox/locker door access
-- **Photo evidence** with a camera that captures images on access events
-- **Instant notifications** via email/SMS for deliveries and pickups
-- **Battery status monitoring** with low-battery alerts
-- **User-friendly dashboard** for viewing events, images, and managing settings
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.11+ for backend
-- Node.js 18+ for frontend
-- MySQL database
-- AWS account (for production deployment)
-- Clerk account (for authentication)
-
-### Local Development Setup
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/mail-guard.git
-   cd mail-guard
-   ```
-
-2. Set up backend:
-
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r backend/requirements.txt -r backend/cdk/requirements.txt
-
-   ```
-
-# Configure environment variables - create .env file in backend/
-
-# See backend/README.md for required variables
-
-# Start the backend
-
-cd backend
-uvicorn main:app --reload --port 8000
-
-````
-
-3. Set up frontend:
+### Local Development
 
 ```bash
+# Clone the repository
+git clone https://github.com/yourusername/mail-guard.git
+cd mail-guard
+
+# Frontend setup
 cd frontend
-npm install
-# or
 pnpm install
-
-# Configure environment variables - create .env.local
-# See frontend/README.md for required variables
-
-# Start the frontend
-npm run dev
-# or
 pnpm dev
-````
+```
 
-4. Open in browser:
-   - Frontend: http://localhost:3000
-   - API Docs: http://localhost:8000/docs
+### Environment Variables
 
-## 🛠️ Technology Stack
+**Frontend (.env.local)**:
 
-### Backend
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key
+CLERK_SECRET_KEY=your_clerk_secret
+DATABASE_URL=mysql://user:pass@your-aiven-host/mailguard
+AWS_ACCESS_KEY_ID=your_s3_key
+AWS_SECRET_ACCESS_KEY=your_s3_secret
+MAILERSEND_API_KEY=your_mailersend_key
+```
 
-- **Python 3.11** with FastAPI & Pydantic
-- **MySQL** database with SSL support
-- **AWS Lambda** & API Gateway for serverless deployment
-- **AWS CDK** for infrastructure as code
-- **S3** for image storage
-- **MailerSend** for email notifications
-
-### Frontend
-
-- **Next.js 15** (App Router) with React 19
-- **TypeScript** for type safety
-- **Tailwind CSS** & shadcn/ui for styling
-- **Clerk** for authentication
-- **Recharts** for data visualization
-
-### Hardware
-
-- **ESP32** microcontroller
-- **OV2640** camera module
-- **Reed switch** for door sensing
-- **Battery-powered** for easy installation
+---
 
 ## 📁 Repository Structure
 
 ```
-.
-├── backend/            # FastAPI backend service
-│   ├── main.py         # API implementation
-│   ├── requirements.txt# Python dependencies
-│   ├── Dockerfile.*    # Docker images for local and Lambda
-│   ├── docker-compose.yml
-│   └── cdk/            # AWS CDK deployment
-├── frontend/           # Next.js frontend application
-│   ├── app/            # Next.js App Router pages
+mail-guard/
+├── frontend/           # Next.js fullstack application
+│   ├── app/            # App Router pages & API routes
 │   ├── components/     # UI components
-│   └── package.json    # Node dependencies
-├── assets/             # Static assets (images, icons)
-└── README.md           # This file
+│   ├── lib/            # Database & utility functions
+│   └── package.json    # Dependencies
+└── assets/             # Documentation assets
 ```
 
-## 📋 Project Documentation
+---
 
-- Backend API: [backend/README.md](backend/README.md)
-- Frontend: [frontend/README.md](frontend/README.md)
-- AWS Deployment: [backend/cdk/README.md](backend/cdk/README.md)
+## 📋 Hardware Bill of Materials
 
-## 🔄 Project Pivot - Delivery Hub
+| Component   | Quantity | Est. Cost | Purpose                   |
+| ----------- | -------- | --------- | ------------------------- |
+| ESP32-CAM   | 1        | $12       | Main controller + camera  |
+| Reed Switch | 1        | $2        | Door open/close detection |
 
-### Pivot Overview
+---
 
-We're expanding Mail Guard beyond individual mailboxes into a **shared, secure delivery hub** for:
+## 🚀 Future Enhancements
 
-- College campuses
-- HOAs and apartment complexes
-- Office buildings
-- Any shared mail/package area
+- **Multi-Unit Management**: Support for multiple cluster mailbox locations
+- **Mobile App**: Native iOS/Android apps for on-the-go monitoring
+- **AI Analytics**: Machine learning for delivery pattern analysis
+- **Integration APIs**: Connect with popular delivery services
+- **Solar Charging**: Extended battery life with solar panel option
 
-### Key Features of Delivery Hub
-
-- **Secure package drop** with access tracking
-- **Photo evidence** of every access event
-- **Real-time notifications** for residents and building staff
-- **Retrofit compatibility** with existing lockers and mailboxes
-
-### Target Environments
-
-- **College dorms & university campuses**
-- **HOA & gated-community mail kiosks**
-- **Multi-tenant apartment buildings**
-- **Office mailrooms**
-
-## 📊 System Architecture
-
-```
-[ESP32 Module]
-├─ Reed switch (door)
-├─ Camera (OV2640)
-│
-↓ HTTPS
-│
-[API Gateway] → [Lambda (FastAPI)]
-               ├─ MySQL (events & devices)
-               ├─ S3 (images)
-               └─ MailerSend (notifications)
-               │
-               ↓
-[Next.js Web Dashboard] ← Clerk Auth
-```
+---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## About
+
+**MailGuard** is a comprehensive IoT solution designed to secure cluster mailboxes and prevent package theft in residential communities. Our smart monitoring system combines hardware sensors, cloud infrastructure, and user-friendly interfaces to provide real-time security and delivery management.
+
+### Topics
+
+🏷️ iot • hardware • security • mailbox • delivery • fullstack • aws • nextjs • fastapi
