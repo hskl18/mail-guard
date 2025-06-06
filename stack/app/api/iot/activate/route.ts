@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Check if serial number exists in valid serials table
     const validSerial = await executeQuery<any[]>(
-      "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = TRUE",
+      "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = 1",
       [serial_number]
     );
 
