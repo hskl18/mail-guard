@@ -822,7 +822,7 @@ export default function DeliveryHubPage() {
                         <span>Operating Costs (45%):</span>
                         <span className="text-red-600">$18,675</span>
                       </div>
-                      <div className="flex justify-between text-sm font-bold text-lg">
+                      <div className="flex justify-between text-lg font-bold">
                         <span>Net Profit:</span>
                         <span className="text-green-600">$22,825</span>
                       </div>
