@@ -834,6 +834,257 @@ export default function DeliveryHubPage() {
           </div>
         </section>
 
+        {/* Deployment Locations */}
+        <section className="w-full py-16 md:py-24 lg:py-32 bg-white">
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="text-center mb-16">
+              <Badge variant="outline" className="mb-4">
+                📍 Deployment Locations
+              </Badge>
+              <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
+                Where Mail Guard Can Be Deployed
+              </h2>
+              <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
+                Our smart delivery hub system is designed for versatile
+                deployment across various environments, with campus
+                installations being our primary focus and expertise.
+              </p>
+            </div>
+
+            {/* Primary Target: Campus Environments */}
+            <div className="mb-16">
+              <div className="text-center mb-12">
+                <Badge variant="secondary" className="mb-4">
+                  🎯 Primary Target Markets
+                </Badge>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Campus & Educational Environments
+                </h3>
+                <p className="text-gray-600 max-w-2xl mx-auto">
+                  Optimized for high-density student populations with unique
+                  delivery challenges
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                <div className="group">
+                  <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200 transition-colors">
+                        <GraduationCap className="h-8 w-8 text-blue-600" />
+                      </div>
+                      <h4 className="text-xl font-bold text-gray-900">
+                        Universities & Colleges
+                      </h4>
+                      <ul className="text-gray-600 leading-relaxed space-y-2 text-sm">
+                        <li>• Student dormitories & residence halls</li>
+                        <li>• Academic building clusters</li>
+                        <li>• Student union buildings</li>
+                        <li>• Graduate student housing</li>
+                      </ul>
+                      <div className="pt-2 text-xs text-green-600 font-medium">
+                        ✓ Primary focus with proven ROI
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="group">
+                  <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="p-3 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
+                        <School className="h-8 w-8 text-green-600" />
+                      </div>
+                      <h4 className="text-xl font-bold text-gray-900">
+                        Community Colleges
+                      </h4>
+                      <ul className="text-gray-600 leading-relaxed space-y-2 text-sm">
+                        <li>• Commuter student parking areas</li>
+                        <li>• Main campus entrances</li>
+                        <li>• Student services buildings</li>
+                        <li>• Evening program locations</li>
+                      </ul>
+                      <div className="pt-2 text-xs text-blue-600 font-medium">
+                        ⭐ High potential market
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="group">
+                  <div className="relative overflow-hidden rounded-2xl border bg-white p-8 shadow-sm hover:shadow-lg transition-all duration-300 h-full">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="p-3 bg-purple-100 rounded-xl group-hover:bg-purple-200 transition-colors">
+                        <Users className="h-8 w-8 text-purple-600" />
+                      </div>
+                      <h4 className="text-xl font-bold text-gray-900">
+                        Student Housing
+                      </h4>
+                      <ul className="text-gray-600 leading-relaxed space-y-2 text-sm">
+                        <li>• Off-campus apartment complexes</li>
+                        <li>• Greek life houses</li>
+                        <li>• Graduate housing facilities</li>
+                        <li>• Co-op student housing</li>
+                      </ul>
+                      <div className="pt-2 text-xs text-purple-600 font-medium">
+                        🏠 Expanding market segment
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Secondary Markets */}
+            <div className="mb-16">
+              <div className="text-center mb-12">
+                <Badge variant="outline" className="mb-4">
+                  🌟 Secondary Markets
+                </Badge>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  High-Density Residential & Commercial
+                </h3>
+                <p className="text-gray-600 max-w-2xl mx-auto">
+                  Adaptable solutions for other high-volume delivery
+                  environments
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                <div className="group">
+                  <div className="relative overflow-hidden rounded-xl border bg-gray-50 p-6 shadow-sm hover:shadow-md transition-all duration-300 h-full">
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
+                        <Building className="h-6 w-6 text-orange-600" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Apartment Complexes
+                      </h4>
+                      <p className="text-gray-600 text-sm leading-relaxed">
+                        High-rise buildings with package theft concerns
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="group">
+                  <div className="relative overflow-hidden rounded-xl border bg-gray-50 p-6 shadow-sm hover:shadow-md transition-all duration-300 h-full">
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                        <Briefcase className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Office Buildings
+                      </h4>
+                      <p className="text-gray-600 text-sm leading-relaxed">
+                        Corporate campuses and business parks
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="group">
+                  <div className="relative overflow-hidden rounded-xl border bg-gray-50 p-6 shadow-sm hover:shadow-md transition-all duration-300 h-full">
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                        <Home className="h-6 w-6 text-green-600" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Planned Communities
+                      </h4>
+                      <p className="text-gray-600 text-sm leading-relaxed">
+                        HOA-managed neighborhoods with central delivery points
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="group">
+                  <div className="relative overflow-hidden rounded-xl border bg-gray-50 p-6 shadow-sm hover:shadow-md transition-all duration-300 h-full">
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="p-2 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                        <Users className="h-6 w-6 text-indigo-600" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Senior Living
+                      </h4>
+                      <p className="text-gray-600 text-sm leading-relaxed">
+                        Independent living facilities and retirement communities
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Installation Requirements */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-3xl p-8 lg:p-12">
+              <div className="text-center mb-12">
+                <Badge variant="secondary" className="mb-4">
+                  🔧 Installation Requirements
+                </Badge>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Deployment Specifications
+                </h3>
+                <p className="text-gray-600 max-w-2xl mx-auto">
+                  Technical requirements and site preparation for successful
+                  Mail Guard deployment
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <Zap className="h-5 w-5 text-red-600" />
+                    </div>
+                    <h4 className="text-lg font-semibold">
+                      Power & Connectivity
+                    </h4>
+                  </div>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li>• 220V electrical connection</li>
+                    <li>• High-speed internet (100+ Mbps)</li>
+                    <li>• Backup power capability</li>
+                    <li>• Cellular data backup option</li>
+                  </ul>
+                </div>
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <MapPin className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <h4 className="text-lg font-semibold">
+                      Space Requirements
+                    </h4>
+                  </div>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li>• 8' x 6' footprint minimum</li>
+                    <li>• Weather-protected location</li>
+                    <li>• ADA-compliant access</li>
+                    <li>• Vehicle loading zone nearby</li>
+                  </ul>
+                </div>
+                <div className="bg-white rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Shield className="h-5 w-5 text-green-600" />
+                    </div>
+                    <h4 className="text-lg font-semibold">Security & Access</h4>
+                  </div>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li>• 24/7 camera monitoring</li>
+                    <li>• Well-lit installation area</li>
+                    <li>• Controlled access environment</li>
+                    <li>• Emergency contact protocols</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-8 text-center">
+                <div className="inline-flex items-center space-x-2 px-6 py-3 bg-white border border-blue-200 rounded-full text-sm text-blue-700">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-medium">
+                    Free site assessment and installation consultation included
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Competitive Advantages */}
         <section className="w-full py-16 md:py-24 lg:py-32 bg-gray-50">
           <div className="container mx-auto px-4 md:px-6">

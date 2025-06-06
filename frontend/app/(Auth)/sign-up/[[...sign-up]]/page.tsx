@@ -44,7 +44,7 @@ export default async function SignUpPage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sm:p-8">
+          <div className="p-6 sm:p-8">
             <SignUp
               appearance={{
                 elements: {

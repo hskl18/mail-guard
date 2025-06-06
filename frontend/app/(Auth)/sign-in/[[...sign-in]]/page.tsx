@@ -44,7 +44,7 @@ export default async function SignInPage() {
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sm:p-8">
+          <div className="p-6 sm:p-8">
             <SignIn
               appearance={{
                 elements: {
@@ -62,7 +62,6 @@ export default async function SignInPage() {
                   dividerText: "text-gray-500 text-sm",
                 },
               }}
-              redirectUrl="/"
               fallbackRedirectUrl="/"
             />
           </div>
