@@ -34,6 +34,12 @@ A web application for monitoring smart mailbox devices in real-time.
    NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
    NEXT_PUBLIC_CLERK_SECRET_KEY=your_clerk_secret_key
+
+   # MailerSend Configuration (for email notifications)
+   MAILERSEND_API_KEY=your_mailersend_api_key
+   MAILERSEND_FROM_EMAIL=your_verified_email@yourdomain.com
+   MAILERSEND_FROM_NAME="Mail Guard"
+   NEXT_PUBLIC_APP_URL=https://your-app-url.com
    ```
 
 3. Run development server:
@@ -59,6 +65,10 @@ Deploy with Vercel, Netlify, or any Node.js hosting.
 - `NEXT_PUBLIC_API_BASE_URL`: Base URL for backend API
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key
 - `NEXT_PUBLIC_CLERK_SECRET_KEY`: Clerk secret key
+- `MAILERSEND_API_KEY`: MailerSend API key for email notifications
+- `MAILERSEND_FROM_EMAIL`: Verified email address for sending notifications
+- `MAILERSEND_FROM_NAME`: Name to display as sender (default: "Mail Guard")
+- `NEXT_PUBLIC_APP_URL`: URL of your deployed application
 
 ## License
 

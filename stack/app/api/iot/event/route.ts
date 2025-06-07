@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
+import { sendEventNotification } from "@/lib/email";
+import { clerkClient } from "@clerk/nextjs/server";
 
 // POST /api/iot/event - Push event from IoT device
 export async function POST(request: NextRequest) {
@@ -163,7 +165,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Create notification if needed (for important events)
-      if (standardEventType === "open" || standardEventType === "delivery") {
+      if (
+        standardEventType === "open" ||
+        standardEventType === "delivery" ||
+        standardEventType === "removal"
+      ) {
         try {
           // Use simpler notification creation without message column for now
           await executeQuery(
@@ -175,6 +181,89 @@ export async function POST(request: NextRequest) {
           // Log but don't fail the event if notification creation fails
           console.log("Notification creation failed:", notificationError);
         }
+      }
+
+      // Send email notification if user has email notifications enabled
+      try {
+        // Get device notification preferences (without email)
+        const userDevice = await executeQuery<any[]>(
+          `SELECT name, email_notifications, mail_delivered_notify, mailbox_opened_notify, mail_removed_notify 
+           FROM devices WHERE id = ?`,
+          [deviceId]
+        );
+
+        if (userDevice.length > 0) {
+          const device = userDevice[0];
+          const shouldSendEmail = device.email_notifications === 1;
+
+          // Check if user wants notifications for this specific event type
+          let shouldSendForEventType = false;
+          if (
+            standardEventType === "delivery" &&
+            device.mail_delivered_notify === 1
+          ) {
+            shouldSendForEventType = true;
+          } else if (
+            standardEventType === "open" &&
+            device.mailbox_opened_notify === 1
+          ) {
+            shouldSendForEventType = true;
+          } else if (
+            standardEventType === "removal" &&
+            device.mail_removed_notify === 1
+          ) {
+            shouldSendForEventType = true;
+          }
+
+          if (shouldSendEmail && shouldSendForEventType) {
+            // Get user's email from Clerk using clerk_id
+            try {
+              const client = await clerkClient();
+              const user = await client.users.getUser(clerkId);
+              const userEmail = user.primaryEmailAddress?.emailAddress;
+
+              if (userEmail) {
+                console.log(
+                  `Sending email notification for ${standardEventType} event to ${userEmail} (clerk_id: ${clerkId})`
+                );
+
+                const emailSent = await sendEventNotification({
+                  to: userEmail,
+                  deviceName: device.name || "Your Mailbox",
+                  eventType: standardEventType,
+                  timestamp: new Date().toISOString(),
+                  deviceId: deviceId,
+                });
+
+                if (emailSent) {
+                  console.log(
+                    `Email notification sent successfully for device ${deviceId} to user ${clerkId}`
+                  );
+                } else {
+                  console.log(
+                    `Failed to send email notification for device ${deviceId}`
+                  );
+                }
+              } else {
+                console.log(
+                  `No email address found for user ${clerkId} - skipping email notification`
+                );
+              }
+            } catch (clerkError) {
+              console.error(
+                `Error getting user from Clerk (${clerkId}):`,
+                clerkError
+              );
+            }
+          } else {
+            console.log(
+              `Email notification skipped for device ${deviceId}: email_notifications=${device.email_notifications}, event_notify=${shouldSendForEventType}`
+            );
+          }
+        }
+      } catch (emailError) {
+        // Log but don't fail the event if email sending fails
+        console.error("Email notification error:", emailError);
       }
 
       return NextResponse.json({
