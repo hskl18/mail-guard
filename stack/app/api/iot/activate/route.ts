@@ -14,24 +14,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if serial number exists in valid serials table
-    const validSerial = await executeQuery<any[]>(
-      "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = 1",
+    // Check if serial number exists in valid serials table, if not create it automatically
+    let validSerial = await executeQuery<any[]>(
+      "SELECT * FROM device_serials WHERE serial_number = ?",
       [serial_number]
     );
 
+    let deviceInfo;
     if (validSerial.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Invalid serial number",
-          serial_number: serial_number,
-          status: "invalid",
-        },
-        { status: 404 }
+      // Auto-create serial number entry for any new device
+      await executeQuery(
+        "INSERT INTO device_serials (serial_number, device_model, manufactured_date, is_valid) VALUES (?, ?, ?, ?)",
+        [
+          serial_number,
+          "mailbox_monitor_v1",
+          new Date().toISOString().split("T")[0],
+          1,
+        ]
       );
-    }
 
-    const deviceInfo = validSerial[0];
+      // Fetch the newly created record
+      validSerial = await executeQuery<any[]>(
+        "SELECT * FROM device_serials WHERE serial_number = ?",
+        [serial_number]
+      );
+      deviceInfo = validSerial[0];
+    } else {
+      deviceInfo = validSerial[0];
+
+      // Ensure the device is marked as valid (in case it was disabled)
+      if (!deviceInfo.is_valid) {
+        await executeQuery(
+          "UPDATE device_serials SET is_valid = 1 WHERE serial_number = ?",
+          [serial_number]
+        );
+        deviceInfo.is_valid = 1;
+      }
+    }
 
     // Update or create device status record
     const existingStatus = await executeQuery<any[]>(
@@ -102,20 +121,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get device info from serials table
-    const deviceSerial = await executeQuery<any[]>(
+    // Get device info from serials table, create if doesn't exist
+    let deviceSerial = await executeQuery<any[]>(
       "SELECT * FROM device_serials WHERE serial_number = ?",
       [serialNumber]
     );
 
     if (deviceSerial.length === 0) {
-      return NextResponse.json(
-        {
-          error: "Serial number not found",
-          serial_number: serialNumber,
-          status: "invalid",
-        },
-        { status: 404 }
+      // Auto-create serial number entry for any new device
+      await executeQuery(
+        "INSERT INTO device_serials (serial_number, device_model, manufactured_date, is_valid) VALUES (?, ?, ?, ?)",
+        [
+          serialNumber,
+          "mailbox_monitor_v1",
+          new Date().toISOString().split("T")[0],
+          1,
+        ]
+      );
+
+      // Fetch the newly created record
+      deviceSerial = await executeQuery<any[]>(
+        "SELECT * FROM device_serials WHERE serial_number = ?",
+        [serialNumber]
       );
     }
 
@@ -128,14 +155,27 @@ export async function GET(request: NextRequest) {
     const serialInfo = deviceSerial[0];
     const statusInfo = deviceStatus.length > 0 ? deviceStatus[0] : null;
 
+    // Check if device is linked to dashboard (exists in devices table)
+    const dashboardDevice = await executeQuery<any[]>(
+      "SELECT id, clerk_id, name FROM devices WHERE serial_number = ?",
+      [serialNumber]
+    );
+
+    const isDashboardLinked = dashboardDevice.length > 0;
+    const dashboardDeviceId = isDashboardLinked ? dashboardDevice[0].id : null;
+
     return NextResponse.json({
       serial_number: serialNumber,
       is_valid: serialInfo.is_valid,
-      is_claimed: serialInfo.is_claimed,
-      claimed_by: serialInfo.claimed_by_clerk_id,
+      is_claimed: serialInfo.is_claimed || isDashboardLinked, // Consider dashboard-linked as claimed
+      claimed_by:
+        serialInfo.claimed_by_clerk_id ||
+        (isDashboardLinked ? dashboardDevice[0].clerk_id : null),
       claimed_at: serialInfo.claimed_at,
       device_model: serialInfo.device_model,
       manufactured_date: serialInfo.manufactured_date,
+      dashboard_device_id: dashboardDeviceId, // Add dashboard device ID
+      dashboard_linked: isDashboardLinked, // Add dashboard link status
       status: statusInfo
         ? {
             is_online: statusInfo.is_online,

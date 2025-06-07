@@ -46,7 +46,58 @@ export default function Notifications() {
   const [error, setError] = useState("");
   const [devices, setDevices] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [images, setImages] = useState<{ [key: string]: string }>({});
+  const [images, setImages] = useState<any[]>([]);
+
+  // Function to find image for a notification (similar to dashboard)
+  const findImageForNotification = (notification: any) => {
+    if (!images.length) return null;
+
+    const notificationTime = new Date(notification.sent_at);
+
+    // Look for images within 5 minutes of this notification
+    const matchingImages = images.filter((img) => {
+      const imgTime = new Date(img.captured_at);
+      const timeDiff = Math.abs(notificationTime.getTime() - imgTime.getTime());
+      const fiveMinutes = 5 * 60 * 1000;
+
+      // Check if image is close in time and matches device
+      const timeMatch = timeDiff <= fiveMinutes;
+
+      // Check device matching
+      let deviceMatch = false;
+
+      if (notification.device_id && img.device_id) {
+        deviceMatch = notification.device_id === img.device_id;
+      }
+
+      if (
+        !deviceMatch &&
+        notification.device_id &&
+        typeof notification.device_id === "string" &&
+        notification.device_id.startsWith("iot_")
+      ) {
+        const notificationSerial = notification.device_id.replace("iot_", "");
+        deviceMatch = img.serial_number === notificationSerial;
+      }
+
+      return timeMatch && deviceMatch;
+    });
+
+    // Return the closest image
+    if (matchingImages.length > 0) {
+      return matchingImages.sort((a, b) => {
+        const aTime = Math.abs(
+          notificationTime.getTime() - new Date(a.captured_at).getTime()
+        );
+        const bTime = Math.abs(
+          notificationTime.getTime() - new Date(b.captured_at).getTime()
+        );
+        return aTime - bTime;
+      })[0];
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     const loadNotifications = async () => {
@@ -76,6 +127,8 @@ export default function Notifications() {
 
         const dashboardData = await dashboardRes.json();
         console.log("Dashboard data:", dashboardData);
+        console.log("Events count:", dashboardData.recent_events?.length || 0);
+        console.log("Images count:", dashboardData.recent_images?.length || 0);
 
         // Extract and process devices
         const devicesData = Array.isArray(dashboardData.devices)
@@ -88,43 +141,65 @@ export default function Notifications() {
           ? dashboardData.recent_events
           : [];
 
-        // Extract and process images
+        // Extract and process images - store as array
         const imagesData = Array.isArray(dashboardData.recent_images)
           ? dashboardData.recent_images
           : [];
-
-        // Create an image lookup map
-        const imageMap: { [key: string]: string } = {};
-        imagesData.forEach((img: any) => {
-          if (img.device_id && img.image_url) {
-            imageMap[img.device_id] = img.image_url;
-          }
-        });
-        setImages(imageMap);
+        setImages(imagesData);
 
         // Convert events to notification format
         const allNotifications: any[] = [];
 
         // Process events to match the notification format
         eventsData.forEach((event: any) => {
-          const device = devicesData.find((d: any) => d.id === event.device_id);
-          if (device) {
-            allNotifications.push({
-              id: `event_${event.id}`,
-              device_id: event.device_id,
-              deviceName: device.name,
-              deviceLocation: device.location,
-              type: event.event_type,
-              notification_type: event.event_type,
-              time: new Date(event.occurred_at).toLocaleString(),
-              sent_at: event.occurred_at,
-              message: getNotificationMessage(event.event_type, device.name),
-              read: true,
-              hasImage:
-                event.event_type === "open" ||
-                event.event_type === "mail_delivered",
-            });
+          // Handle both regular events and IoT events
+          let device = null;
+          let deviceName = "Unknown Device";
+          let deviceLocation = "";
+
+          if (event.device_id && typeof event.device_id === "number") {
+            // Regular dashboard event - find matching device
+            device = devicesData.find((d: any) => d.id === event.device_id);
+            if (device) {
+              deviceName =
+                device.name || device.serial_number || "Unknown Device";
+              deviceLocation = device.location || "";
+            }
+          } else if (event.device_name) {
+            // IoT event - use provided device info
+            deviceName = event.device_name;
+            deviceLocation = event.device_location || "";
+          } else if (event.serial_number) {
+            // IoT event with serial - try to find matching device
+            device = devicesData.find(
+              (d: any) => d.serial_number === event.serial_number
+            );
+            if (device) {
+              deviceName = device.name || device.serial_number;
+              deviceLocation = device.location || "";
+            } else {
+              deviceName = `IoT Device (${event.serial_number})`;
+              deviceLocation = "Serial: " + event.serial_number;
+            }
           }
+
+          // Always create notification, even if device not found
+          allNotifications.push({
+            id: `event_${event.id}`,
+            device_id: event.device_id || `iot_${event.serial_number}`,
+            deviceName: deviceName,
+            deviceLocation: deviceLocation,
+            type: event.event_type,
+            notification_type: event.event_type,
+            time: new Date(event.occurred_at).toLocaleString(),
+            sent_at: event.occurred_at,
+            message: getNotificationMessage(event.event_type, deviceName),
+            read: true,
+            hasImage:
+              event.event_type === "open" ||
+              event.event_type === "delivery" ||
+              event.event_type === "mail_delivered",
+          });
         });
 
         // Sort notifications by date (newest first)
@@ -134,6 +209,8 @@ export default function Notifications() {
         );
 
         setNotifications(allNotifications);
+        console.log("Processed notifications:", allNotifications.length);
+        console.log("Sample notifications:", allNotifications.slice(0, 3));
       } catch (err: any) {
         console.error("Failed to load notifications:", err);
         setError(`Error loading notifications: ${err.message}`);
@@ -181,12 +258,23 @@ export default function Notifications() {
           (n) => n.type === filter || n.notification_type === filter
         );
 
-  const openImageDialog = (deviceId: number) => {
-    const imageUrl = images[deviceId];
-    if (imageUrl) {
-      setSelectedImage(imageUrl);
+  const openImageDialog = (notification: any) => {
+    const image = findImageForNotification(notification);
+    if (image) {
+      // Use the image proxy endpoint instead of direct S3 URL
+      const imageId = image.source === "iot" ? `iot_${image.id}` : image.id;
+      const proxyUrl = `/api/image/${imageId}`;
+
+      console.log("Opening notification image via proxy:", {
+        notification: notification.type,
+        imageId,
+        proxyUrl,
+        originalImage: image,
+      });
+
+      setSelectedImage(proxyUrl);
     } else {
-      // Fallback to placeholder
+      console.log("No image found for notification:", notification.id);
       setSelectedImage("/placeholder.svg?height=400&width=600");
     }
   };
@@ -276,7 +364,7 @@ export default function Notifications() {
                       variant="outline"
                       size="sm"
                       className="text-xs"
-                      onClick={() => openImageDialog(notification.device_id)}
+                      onClick={() => openImageDialog(notification)}
                     >
                       <ImageIcon className="h-3 w-3 mr-1" /> View
                     </Button>

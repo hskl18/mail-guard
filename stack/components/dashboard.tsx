@@ -8,6 +8,8 @@ import {
   AlertTriangle,
   Users,
   Building,
+  X,
+  Eye,
 } from "lucide-react";
 import {
   Card,
@@ -20,6 +22,12 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Link from "next/link";
 
 export default function Dashboard() {
@@ -28,7 +36,10 @@ export default function Dashboard() {
   const [recentEvents, setRecentEvents] = useState<any[]>([]);
   const [recentImages, setRecentImages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [error, setError] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -113,6 +124,48 @@ export default function Dashboard() {
     loadDashboardData();
   }, [user?.id]);
 
+  const handleRemoveDevice = async () => {
+    if (!currentDevice || !user?.id) return;
+
+    const confirmRemoval = window.confirm(
+      `Are you sure you want to remove "${currentDevice.name}"? This will disconnect the device from your dashboard.`
+    );
+
+    if (!confirmRemoval) return;
+
+    setIsRemoving(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `/api/devices/${currentDevice.id}?clerk_id=${user.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to remove device");
+      }
+
+      // Refresh the dashboard data to show no device state
+      setDevices([]);
+      setRecentEvents([]);
+      setRecentImages([]);
+
+      // Optional: Show success message
+      console.log("Device removed successfully");
+    } catch (err: any) {
+      console.error("Error removing device:", err);
+      setError(`Failed to remove device: ${err.message}`);
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
   // Show loading state
   if (isLoading && !devices.length) {
     return (
@@ -146,10 +199,22 @@ export default function Dashboard() {
   if (!currentDevice) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <p className="mb-4 text-gray-600">No delivery hubs connected yet.</p>
-        <Link href="/connect-device">
-          <Button>Connect Mailbox</Button>
-        </Link>
+        <div className="text-center">
+          <Mail className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            No Device Connected
+          </h3>
+          <p className="mb-6 text-gray-600 max-w-sm">
+            Connect your IoT mailbox monitoring device to start tracking
+            deliveries and events.
+          </p>
+          <Link href="/connect-device">
+            <Button size="lg">
+              <Building className="mr-2 h-4 w-4" />
+              Connect IoT Device
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -178,19 +243,104 @@ export default function Dashboard() {
     }
   };
 
+  const findImageForEvent = (event: any) => {
+    // Try to find image for this event
+    const eventTime = new Date(event.occurred_at);
+
+    // Look for images within 5 minutes of this event
+    const matchingImages = recentImages.filter((img) => {
+      const imgTime = new Date(img.captured_at);
+      const timeDiff = Math.abs(eventTime.getTime() - imgTime.getTime());
+      const fiveMinutes = 5 * 60 * 1000;
+
+      // Check if image is close in time and matches device/serial
+      const timeMatch = timeDiff <= fiveMinutes;
+
+      // Check device matching with multiple strategies
+      let deviceMatch = false;
+
+      if (event.device_id && img.device_id) {
+        deviceMatch = event.device_id === img.device_id;
+      }
+
+      if (!deviceMatch && event.serial_number && img.serial_number) {
+        deviceMatch = event.serial_number === img.serial_number;
+      }
+
+      if (
+        !deviceMatch &&
+        event.device_id &&
+        typeof event.device_id === "string" &&
+        event.device_id.startsWith("iot_")
+      ) {
+        const eventSerial = event.device_id.replace("iot_", "");
+        deviceMatch = img.serial_number === eventSerial;
+      }
+
+      return timeMatch && deviceMatch;
+    });
+
+    // Return the closest image
+    if (matchingImages.length > 0) {
+      return matchingImages.sort((a, b) => {
+        const aTime = Math.abs(
+          eventTime.getTime() - new Date(a.captured_at).getTime()
+        );
+        const bTime = Math.abs(
+          eventTime.getTime() - new Date(b.captured_at).getTime()
+        );
+        return aTime - bTime;
+      })[0];
+    }
+
+    return null;
+  };
+
+  const handleViewImage = (event: any) => {
+    const image = findImageForEvent(event);
+    if (image) {
+      // Use the image proxy endpoint instead of direct S3 URL
+      const imageId = image.source === "iot" ? `iot_${image.id}` : image.id;
+      const proxyUrl = `/api/image/${imageId}`;
+
+      console.log("Opening image modal:", {
+        event: event.event_type,
+        imageId,
+        proxyUrl,
+        originalImage: image,
+      });
+
+      setSelectedImage(proxyUrl);
+      setImageModalOpen(true);
+    }
+  };
+
   return (
     <div>
       <div className="flex justify-end mb-4">
         <Link href="/connect-device">
-          <Button>Connect Mailbox</Button>
+          <Button variant="outline">
+            <Building className="mr-2 h-4 w-4" />
+            Connect Another Device
+          </Button>
         </Link>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Status Card */}
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Delivery Hub Status</CardTitle>
-            <CardDescription>Info for {currentDevice.name}</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle>Delivery Hub Status</CardTitle>
+              <CardDescription>Info for {currentDevice.name}</CardDescription>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleRemoveDevice}
+              disabled={isRemoving}
+            >
+              {isRemoving ? "Removing..." : "Remove Device"}
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -253,6 +403,8 @@ export default function Dashboard() {
                   text,
                   color,
                 } = getEventDisplay(event.event_type);
+                const hasImage = findImageForEvent(event);
+
                 return (
                   <div key={event.id}>
                     <div className="flex items-start justify-between">
@@ -263,12 +415,24 @@ export default function Dashboard() {
                           <p className="text-xs text-gray-500">
                             {new Date(event.occurred_at).toLocaleString()}
                           </p>
+                          {event.source === "iot" && (
+                            <p className="text-xs text-blue-600">
+                              IoT Device: {event.serial_number}
+                            </p>
+                          )}
                         </div>
                       </div>
                       {(event.event_type === "open" ||
                         event.event_type === "delivery") && (
-                        <Button variant="ghost" size="sm" className="text-xs">
-                          View Image
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => handleViewImage(event)}
+                          disabled={!hasImage}
+                        >
+                          <Eye className="mr-1 h-3 w-3" />
+                          {hasImage ? "View Image" : "No Image"}
                         </Button>
                       )}
                     </div>
@@ -287,6 +451,51 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Image Modal */}
+      <Dialog
+        open={imageModalOpen}
+        onOpenChange={(open) => {
+          setImageModalOpen(open);
+          if (!open) {
+            // Clear selected image when modal closes
+            setSelectedImage(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Event Image</DialogTitle>
+          </DialogHeader>
+          <div className="relative">
+            {selectedImage && (
+              <div className="flex justify-center">
+                <img
+                  src={selectedImage}
+                  alt="Event captured image"
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                  onError={(e) => {
+                    console.error("Image failed to load:", selectedImage);
+                    console.error(
+                      "This should be a proxy URL like /api/image/123, not a direct S3 URL"
+                    );
+                    e.currentTarget.style.display = "none";
+                    // Show error message
+                    const errorDiv = document.createElement("div");
+                    errorDiv.className = "text-center text-gray-500 p-8";
+                    errorDiv.innerHTML = `
+                      <p>Image could not be loaded</p>
+                      <p class="text-xs mt-2">URL: ${selectedImage}</p>
+                      <p class="text-xs">Expected format: /api/image/123</p>
+                    `;
+                    e.currentTarget.parentNode?.appendChild(errorDiv);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

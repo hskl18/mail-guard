@@ -21,15 +21,58 @@ export default function ConnectDevicePage() {
   const { user, isLoaded } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
+    serial_number: "",
     name: "",
     location: "",
   });
+  const [validationStatus, setValidationStatus] = useState<
+    "idle" | "validating" | "valid" | "invalid"
+  >("idle");
+  const [validationMessage, setValidationMessage] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+
+    // Reset validation when serial number changes
+    if (e.target.name === "serial_number") {
+      setValidationStatus("idle");
+      setValidationMessage("");
+    }
+  };
+
+  const validateSerialNumber = async () => {
+    if (!formData.serial_number) return;
+
+    setValidationStatus("validating");
+    setValidationMessage("Checking device serial number...");
+
+    try {
+      const response = await fetch(
+        `/api/iot/activate?serial_number=${formData.serial_number}`
+      );
+      const data = await response.json();
+
+      if (response.ok && data.is_valid) {
+        setValidationStatus("valid");
+        setValidationMessage(`✅ Valid device: ${data.device_model}`);
+        // Auto-fill name with serial number if empty
+        if (!formData.name) {
+          setFormData((prev) => ({ ...prev, name: formData.serial_number }));
+        }
+      } else {
+        setValidationStatus("invalid");
+        setValidationMessage(
+          "❌ Invalid serial number. Please check and try again."
+        );
+      }
+    } catch (error) {
+      setValidationStatus("invalid");
+      setValidationMessage("❌ Error validating device. Please try again.");
+      console.error("Validation error:", error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,9 +82,16 @@ export default function ConnectDevicePage() {
       return;
     }
 
+    // Validate serial number first if not already done
+    if (validationStatus !== "valid") {
+      await validateSerialNumber();
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      // Create device in dashboard with the validated serial number
       const response = await fetch("/api/devices", {
         method: "POST",
         headers: {
@@ -52,6 +102,7 @@ export default function ConnectDevicePage() {
           email: user.primaryEmailAddress?.emailAddress || "",
           name: formData.name,
           location: formData.location,
+          serial_number: formData.serial_number, // Include serial number
           is_active: true,
         }),
       });
@@ -64,6 +115,7 @@ export default function ConnectDevicePage() {
       router.refresh();
     } catch (error) {
       console.error("Error registering device:", error);
+      setValidationMessage("❌ Failed to connect device. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -80,19 +132,58 @@ export default function ConnectDevicePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Connect Delivery Hub</CardTitle>
+          <CardTitle>Connect IoT Device</CardTitle>
           <CardDescription>
-            Register your mail area monitoring system
+            Connect your mailbox monitoring device to the dashboard
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Hub ID / Serial Number</Label>
+              <Label htmlFor="serial_number">Device Serial Number</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="serial_number"
+                  name="serial_number"
+                  placeholder="SN001234567"
+                  value={formData.serial_number}
+                  onChange={handleChange}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={validateSerialNumber}
+                  disabled={
+                    !formData.serial_number || validationStatus === "validating"
+                  }
+                >
+                  {validationStatus === "validating"
+                    ? "Checking..."
+                    : "Validate"}
+                </Button>
+              </div>
+              {validationMessage && (
+                <p
+                  className={`text-sm ${
+                    validationStatus === "valid"
+                      ? "text-green-600"
+                      : validationStatus === "invalid"
+                      ? "text-red-600"
+                      : "text-gray-600"
+                  }`}
+                >
+                  {validationMessage}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Device Name</Label>
               <Input
                 id="name"
                 name="name"
-                placeholder="Main Delivery Hub"
+                placeholder="Main Mailbox Monitor"
                 value={formData.name}
                 onChange={handleChange}
                 required
@@ -104,7 +195,7 @@ export default function ConnectDevicePage() {
               <Input
                 id="location"
                 name="location"
-                placeholder="Building A Lobby"
+                placeholder="Front Door Mailbox"
                 value={formData.location}
                 onChange={handleChange}
               />
@@ -113,9 +204,18 @@ export default function ConnectDevicePage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting || !formData.name}
+              disabled={
+                isSubmitting ||
+                !formData.serial_number ||
+                !formData.name ||
+                validationStatus === "invalid"
+              }
             >
-              {isSubmitting ? "Connecting..." : "Connect Hub"}
+              {isSubmitting
+                ? "Connecting..."
+                : validationStatus === "valid"
+                ? "Connect Device"
+                : "Validate & Connect"}
             </Button>
           </form>
         </CardContent>

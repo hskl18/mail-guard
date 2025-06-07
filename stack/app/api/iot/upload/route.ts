@@ -115,11 +115,26 @@ export async function POST(request: NextRequest) {
 
         const eventId = recentEvent.length > 0 ? recentEvent[0].id : null;
 
-        imageRecord = await executeQuery(
-          `INSERT INTO images (device_id, image_url, captured_at, event_id) 
-           VALUES (?, ?, NOW(), ?)`,
-          [deviceId, s3Url, eventId]
-        );
+        // Try inserting with event_id first, fallback without it if column doesn't exist
+        try {
+          imageRecord = await executeQuery(
+            `INSERT INTO images (device_id, image_url, captured_at, event_id) 
+             VALUES (?, ?, NOW(), ?)`,
+            [deviceId, s3Url, eventId]
+          );
+        } catch (dbError: any) {
+          // If event_id column doesn't exist, insert without it
+          if (dbError.code === "ER_BAD_FIELD_ERROR") {
+            console.log("event_id column not found, inserting without it");
+            imageRecord = await executeQuery(
+              `INSERT INTO images (device_id, image_url, captured_at) 
+               VALUES (?, ?, NOW())`,
+              [deviceId, s3Url]
+            );
+          } else {
+            throw dbError;
+          }
+        }
 
         return NextResponse.json(
           {

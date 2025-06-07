@@ -9,70 +9,14 @@ const char* ssid = WIFI_SSID;
 const char* user = WIFI_USER;
 const char* password = WIFI_PASSWORD;
  
-// Use the same API URL as in the main ESP32 code
-const char* apiUrl = "https://pp7vqzu57gptbbb3m5m3untjgm0iyylm.lambda-url.us-west-1.on.aws";
+// Production Mail Guard API URL
+const char* apiUrl = "https://mail-guard-ten.vercel.app";
 
-// Device identification - this should match the one in main ESP32
-const char* SERIES_ID = "ESP32_001";
-int deviceId = -1; // Will be populated after device registration
-
-// Legacy variables kept for backward compatibility
-const char* serverIpAddress = SERVER_IP; 
-const char* serverPortChar = SERVER_PORT;
-const int serverPort = atoi(serverPortChar);
-String imageUploadUrl; 
+// Device identification - matches the Python test script approach
+const char* SERIAL_NUMBER = "ESP32_001";
 
 unsigned long lastTriggerTime = 0;
 const unsigned long triggerCooldown = 5000;
-
-// Function to get device ID from the backend using SERIES_ID
-bool getDeviceId() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi not connected. Cannot get device ID.");
-    return false;
-  }
-
-  HTTPClient http;
-  
-  // Call the endpoint that gets device info from Series ID
-  String url = String(apiUrl) + "/device/lookup?serial_id=" + String(SERIES_ID);
-  Serial.print("Getting device ID from: ");
-  Serial.println(url);
-  
-  http.begin(url);
-  int httpResponseCode = http.GET();
-  
-  if (httpResponseCode == 200) {
-    String response = http.getString();
-    Serial.println("Response received:");
-    Serial.println(response);
-    
-    // Basic parsing for device_id (simplified compared to main ESP32)
-    int startIdx = response.indexOf("\"device_id\":");
-    if (startIdx > 0) {
-      startIdx += 11; // Length of "device_id":
-      int endIdx = response.indexOf(",", startIdx);
-      if (endIdx < 0) endIdx = response.indexOf("}", startIdx);
-      
-      if (endIdx > startIdx) {
-        String deviceIdStr = response.substring(startIdx, endIdx);
-        deviceIdStr.trim();
-        deviceId = deviceIdStr.toInt();
-        
-        Serial.print("Device ID: ");
-        Serial.println(deviceId);
-        return true;
-      }
-    }
-    Serial.println("Failed to parse device_id from response");
-  } else {
-    Serial.print("Error getting device ID: ");
-    Serial.println(httpResponseCode);
-  }
-  
-  http.end();
-  return false;
-}
 
 void setup() {
   Serial.begin(115200);
@@ -107,18 +51,7 @@ void setup() {
   }
 
 
-  // Try to get device ID
-  if (!getDeviceId()) {
-    Serial.println("Failed to get device ID. Will use legacy upload URL.");
-    // Fall back to legacy URL format if device ID cannot be obtained
-    imageUploadUrl = "http://" + String(serverIpAddress) + ":" + String(serverPort) + "/upload";
-  } else {
-    // Use the correct API endpoint without query parameters
-    imageUploadUrl = String(apiUrl) + "/mailbox/images";
-  }
-  
-  Serial.print("Image Upload URL configured to: ");
-  Serial.println(imageUploadUrl);
+  Serial.println("ESP32 Camera ready for image uploads to Mail Guard API");
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -187,31 +120,24 @@ void captureAndSendPhotoToServer() {
   HTTPClient http;
   WiFiClient client;
 
-  if (imageUploadUrl == "") {
-    Serial.println("Image Upload URL is not set. Skipping send.");
-    if (fb) esp_camera_fb_return(fb);
-    return;
-  }
-
+  String imageUploadUrl = String(apiUrl) + "/api/iot/upload";
   Serial.print("Sending image to: ");
   Serial.println(imageUploadUrl);
 
   http.begin(client, imageUploadUrl);
 
-  // --- Start of Fix ---
-
-  // 1. Define the boundary and Content-Type header
+  // Define the boundary and Content-Type header
   String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
   String contentType = "multipart/form-data; boundary=" + boundary;
   http.addHeader("Content-Type", contentType);
 
-  // 2. Manually construct the multipart form data body
-  String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"device_id\"\r\n\r\n" +
-                String(deviceId) + "\r\n" +
+  // Manually construct the multipart form data body - using serial_number like Python script
+  String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"serial_number\"\r\n\r\n" +
+                String(SERIAL_NUMBER) + "\r\n" +
                 "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
   String tail = "\r\n--" + boundary + "--\r\n";
 
-  // 3. Create a single buffer for the entire payload
+  // Create a single buffer for the entire payload
   size_t totalLen = head.length() + fb->len + tail.length();
   uint8_t *payload = new uint8_t[totalLen];
   if (!payload) {
@@ -221,7 +147,7 @@ void captureAndSendPhotoToServer() {
     return;
   }
 
-  // 4. Copy all parts (head, image, tail) into the buffer
+  // Copy all parts (head, image, tail) into the buffer
   char* payload_ptr = (char*)payload;
   memcpy(payload_ptr, head.c_str(), head.length());
   payload_ptr += head.length();
@@ -229,14 +155,11 @@ void captureAndSendPhotoToServer() {
   payload_ptr += fb->len;
   memcpy(payload_ptr, tail.c_str(), tail.length());
 
-
-  // 5. Send the entire payload with http.POST()
+  // Send the entire payload with http.POST()
   int httpResponseCode = http.POST(payload, totalLen);
   
-  // 6. Clean up the allocated memory
+  // Clean up the allocated memory
   delete[] payload;
-
-  // --- End of Fix ---
 
   if (httpResponseCode > 0) {
     String response = http.getString();

@@ -78,6 +78,31 @@ export const getFromS3 = async (key: string) => {
   }
 };
 
+export const getPresignedUrl = async (key: string, expiresIn = 3600) => {
+  const bucketName = process.env.S3_BUCKET;
+
+  if (!bucketName) {
+    throw new Error("S3_BUCKET environment variable not set");
+  }
+
+  const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+  const client = await getS3Client();
+
+  const command = new GetObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+  });
+
+  try {
+    const signedUrl = await getSignedUrl(client, command, { expiresIn });
+    return signedUrl;
+  } catch (error) {
+    console.error("Error generating presigned URL:", error);
+    throw new Error("Failed to generate presigned URL");
+  }
+};
+
 export const deleteFromS3 = async (key: string) => {
   const bucketName = process.env.S3_BUCKET;
 

@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 const API_DOCS = {
   openapi: "3.0.3",
   info: {
-    title: "Mail Guard API",
-    description: "IoT Smart Mailbox Monitoring System API",
-    version: "1.0.0",
+    title: "Mail Guard IoT API",
+    description:
+      "Smart Mailbox Monitoring System API - IoT Device → HTTP API → User Dashboard",
+    version: "2.0.0",
     contact: {
       name: "Mail Guard Team",
       email: "support@mailguard.com",
@@ -14,64 +15,94 @@ const API_DOCS = {
   servers: [
     {
       url: "/api",
-      description: "Production API Server",
+      description: "Mail Guard API Server",
     },
   ],
   tags: [
     {
-      name: "IoT Devices",
-      description: "IoT device management and communication",
+      name: "🌐 IoT Core",
+      description: "Core IoT device communication endpoints",
     },
     {
-      name: "Dashboard",
-      description: "User dashboard and device management",
+      name: "📱 Device Management",
+      description: "User device connection and management",
     },
     {
-      name: "Events",
-      description: "Mailbox events and monitoring",
+      name: "📊 Dashboard",
+      description: "User dashboard and data display",
     },
     {
-      name: "Images",
-      description: "Image capture and storage",
-    },
-    {
-      name: "Notifications",
-      description: "User notifications",
-    },
-    {
-      name: "Database",
-      description: "Database management utilities",
+      name: "🔧 Setup",
+      description: "Database and system initialization",
     },
   ],
   paths: {
-    "/iot/activate": {
+    "/iot/event": {
       post: {
-        tags: ["IoT Devices"],
-        summary: "Validate IoT device serial number",
+        tags: ["🌐 IoT Core"],
+        summary: "🚨 MAIN ENDPOINT: Receive IoT Events",
         description:
-          "IoT device calls this endpoint to validate its serial number and check if it can operate. Does not require user authentication.",
+          "Primary endpoint for IoT devices to send mailbox events (open, close, delivery, removal)",
         requestBody: {
           required: true,
           content: {
             "application/json": {
               schema: {
                 type: "object",
-                required: ["serial_number"],
+                required: ["serial_number", "event_data"],
                 properties: {
                   serial_number: {
                     type: "string",
                     description: "Device serial number",
-                    example: "SN123456789",
+                    example: "SN001234567",
+                  },
+                  event_data: {
+                    type: "object",
+                    required: ["reed_sensor"],
+                    properties: {
+                      reed_sensor: {
+                        type: "boolean",
+                        description:
+                          "Reed sensor state (true=open, false=closed)",
+                        example: true,
+                      },
+                      event_type: {
+                        type: "string",
+                        enum: ["open", "close", "delivery", "removal"],
+                        description: "Type of mailbox event",
+                        example: "open",
+                      },
+                      mailbox_status: {
+                        type: "string",
+                        description: "Human readable status",
+                        example: "opened",
+                      },
+                    },
+                  },
+                  timestamp: {
+                    type: "string",
+                    format: "date-time",
+                    description: "Event timestamp",
+                    example: "2024-01-15T10:30:00Z",
                   },
                   firmware_version: {
                     type: "string",
                     description: "Device firmware version",
-                    example: "1.2.3",
+                    example: "1.2.0",
                   },
-                  device_type: {
-                    type: "string",
-                    description: "Type of device",
-                    example: "mailbox_monitor",
+                  battery_level: {
+                    type: "integer",
+                    minimum: 0,
+                    maximum: 100,
+                    description: "Battery level percentage",
+                    example: 85,
+                  },
+                  signal_strength: {
+                    type: "integer",
+                    minimum: -120,
+                    maximum: 0,
+                    description: "Signal strength in dBm",
+                    example: -45,
                   },
                 },
               },
@@ -80,54 +111,47 @@ const API_DOCS = {
         },
         responses: {
           "200": {
-            description: "Device serial validated successfully",
+            description: "Event recorded successfully",
             content: {
               "application/json": {
                 schema: {
                   type: "object",
                   properties: {
                     message: { type: "string" },
+                    event_id: { type: "integer" },
+                    event_type: { type: "string" },
+                    device_id: { type: "integer" },
                     serial_number: { type: "string" },
-                    status: { type: "string", enum: ["valid"] },
-                    is_claimed: {
-                      type: "boolean",
-                      description: "Whether device is claimed by a user",
+                    status: {
+                      type: "string",
+                      enum: ["claimed_device", "unclaimed_device"],
                     },
-                    device_model: { type: "string" },
-                    can_operate: { type: "boolean" },
-                    last_seen: { type: "string", format: "date-time" },
+                    processed_at: { type: "string", format: "date-time" },
                   },
                 },
               },
             },
           },
           "404": {
-            description: "Invalid serial number",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    error: { type: "string" },
-                    serial_number: { type: "string" },
-                    status: { type: "string", enum: ["invalid"] },
-                  },
-                },
-              },
-            },
+            description: "Invalid device serial number",
           },
         },
       },
+    },
+    "/iot/activate": {
       get: {
-        tags: ["IoT Devices"],
-        summary: "Check device status and information",
+        tags: ["🌐 IoT Core"],
+        summary: "🔍 Validate Device Serial Number",
+        description:
+          "Device validation and status check for connecting devices",
         parameters: [
           {
             name: "serial_number",
             in: "query",
             required: true,
             schema: { type: "string" },
-            description: "Device serial number",
+            description: "Device serial number to validate",
+            example: "SN001234567",
           },
         ],
         responses: {
@@ -141,14 +165,8 @@ const API_DOCS = {
                     serial_number: { type: "string" },
                     is_valid: { type: "boolean" },
                     is_claimed: { type: "boolean" },
-                    claimed_by: { type: "string", nullable: true },
-                    claimed_at: {
-                      type: "string",
-                      format: "date-time",
-                      nullable: true,
-                    },
                     device_model: { type: "string" },
-                    manufactured_date: { type: "string", format: "date" },
+                    dashboard_linked: { type: "boolean" },
                     status: {
                       type: "object",
                       nullable: true,
@@ -171,13 +189,49 @@ const API_DOCS = {
         },
       },
     },
-    "/devices/claim": {
+    "/iot/upload": {
       post: {
-        tags: ["User Devices"],
-        summary: "Claim IoT device",
-        description:
-          "User claims ownership of an IoT device using its serial number",
-        security: [{ bearerAuth: [] }],
+        tags: ["🌐 IoT Core"],
+        summary: "📸 Upload Files from IoT Device",
+        description: "Handle file uploads (images, logs) from IoT devices",
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                properties: {
+                  file: {
+                    type: "string",
+                    format: "binary",
+                    description: "File to upload",
+                  },
+                  serial_number: {
+                    type: "string",
+                    description: "Device serial number",
+                  },
+                  file_type: {
+                    type: "string",
+                    enum: ["image", "log", "diagnostic"],
+                    description: "Type of file",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "File uploaded successfully",
+          },
+        },
+      },
+    },
+    "/iot/report": {
+      post: {
+        tags: ["🌐 IoT Core"],
+        summary: "📊 Device Status Reports",
+        description: "Periodic health and status reports from IoT devices",
         requestBody: {
           required: true,
           content: {
@@ -188,147 +242,27 @@ const API_DOCS = {
                 properties: {
                   serial_number: {
                     type: "string",
-                    description: "Device serial number to claim",
-                    example: "SN123456789",
-                  },
-                  device_name: {
-                    type: "string",
-                    description: "Custom name for the device",
-                    example: "Main Mailbox",
-                  },
-                  location: {
-                    type: "string",
-                    description: "Device location",
-                    example: "Building A Lobby",
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          "201": {
-            description: "Device claimed successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    message: { type: "string" },
-                    device: {
-                      type: "object",
-                      properties: {
-                        id: { type: "integer" },
-                        name: { type: "string" },
-                        serial_number: { type: "string" },
-                        location: { type: "string" },
-                        device_model: { type: "string" },
-                        claimed_at: { type: "string", format: "date-time" },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          "404": {
-            description: "Invalid serial number",
-          },
-          "409": {
-            description: "Device already claimed",
-          },
-        },
-      },
-    },
-    "/iot/event": {
-      post: {
-        tags: ["IoT Devices", "Events"],
-        summary: "Push event from IoT device",
-        description:
-          "Submit reed sensor data and mailbox events from IoT device",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                required: ["serial_number", "event_data"],
-                properties: {
-                  serial_number: {
-                    type: "string",
                     description: "Device serial number",
-                    example: "SN123456789",
-                  },
-                  event_data: {
-                    type: "object",
-                    required: ["reed_sensor"],
-                    properties: {
-                      reed_sensor: {
-                        type: "boolean",
-                        description:
-                          "Reed sensor status (true = open, false = closed)",
-                        example: true,
-                      },
-                      event_type: {
-                        type: "string",
-                        enum: ["open", "close", "delivery", "removal"],
-                        description: "Type of mailbox event",
-                        example: "open",
-                      },
-                      mailbox_status: {
-                        type: "string",
-                        description: "Additional mailbox status info",
-                        example: "mailbox_opened",
-                      },
-                    },
-                  },
-                  timestamp: {
-                    type: "string",
-                    format: "date-time",
-                    description: "Event timestamp (ISO format)",
-                    example: "2024-01-15T10:30:00Z",
+                    example: "SN001234567",
                   },
                   firmware_version: {
                     type: "string",
-                    example: "1.2.3",
+                    example: "1.2.0",
                   },
                   battery_level: {
                     type: "integer",
                     minimum: 0,
                     maximum: 100,
-                    description: "Battery level percentage",
-                    example: 85,
+                    example: 75,
                   },
                   signal_strength: {
                     type: "integer",
-                    minimum: -100,
-                    maximum: 0,
-                    description: "Signal strength in dBm",
-                    example: -65,
+                    example: -55,
                   },
-                },
-              },
-              examples: {
-                mailbox_opened: {
-                  summary: "Mailbox opened event",
-                  value: {
-                    serial_number: "SN123456789",
-                    event_data: {
-                      reed_sensor: true,
-                      event_type: "open",
-                    },
-                    battery_level: 85,
-                    signal_strength: -65,
-                  },
-                },
-                mailbox_closed: {
-                  summary: "Mailbox closed event",
-                  value: {
-                    serial_number: "SN123456789",
-                    event_data: {
-                      reed_sensor: false,
-                      event_type: "close",
-                    },
+                  temperature_celsius: {
+                    type: "integer",
+                    description: "Device temperature",
+                    example: 25,
                   },
                 },
               },
@@ -337,115 +271,16 @@ const API_DOCS = {
         },
         responses: {
           "200": {
-            description: "Event recorded successfully",
-          },
-          "404": {
-            description: "Device not found or not activated",
-          },
-        },
-      },
-      get: {
-        tags: ["IoT Devices", "Events"],
-        summary: "Get device events",
-        parameters: [
-          {
-            name: "serial_number",
-            in: "query",
-            required: true,
-            schema: { type: "string" },
-          },
-          {
-            name: "limit",
-            in: "query",
-            schema: { type: "integer", default: 20 },
-          },
-        ],
-        responses: {
-          "200": {
-            description: "Events retrieved successfully",
-          },
-        },
-      },
-    },
-    "/iot/upload": {
-      post: {
-        tags: ["IoT Devices", "Images"],
-        summary: "Upload image from IoT device",
-        description: "Upload image file from IoT device to S3 storage",
-        requestBody: {
-          required: true,
-          content: {
-            "multipart/form-data": {
-              schema: {
-                type: "object",
-                required: ["file", "serial_number"],
-                properties: {
-                  file: {
-                    type: "string",
-                    format: "binary",
-                    description: "Image file (max 10MB)",
-                  },
-                  serial_number: {
-                    type: "string",
-                    description: "Device serial number",
-                  },
-                  event_type: {
-                    type: "string",
-                    description: "Related event type",
-                    default: "general",
-                  },
-                  timestamp: {
-                    type: "string",
-                    format: "date-time",
-                    description: "Image capture timestamp",
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          "201": {
-            description: "Image uploaded successfully",
-          },
-          "400": {
-            description: "Invalid file or missing parameters",
-          },
-        },
-      },
-      get: {
-        tags: ["IoT Devices", "Images"],
-        summary: "Get device images",
-        parameters: [
-          {
-            name: "serial_number",
-            in: "query",
-            required: true,
-            schema: { type: "string" },
-          },
-          {
-            name: "limit",
-            in: "query",
-            schema: { type: "integer", default: 20 },
-          },
-          {
-            name: "event_type",
-            in: "query",
-            schema: { type: "string" },
-          },
-        ],
-        responses: {
-          "200": {
-            description: "Images retrieved successfully",
+            description: "Status report received successfully",
           },
         },
       },
     },
     "/dashboard": {
       get: {
-        tags: ["Dashboard"],
-        summary: "Get dashboard data",
-        description: "Retrieve comprehensive dashboard data for a user",
+        tags: ["📊 Dashboard"],
+        summary: "🏠 Get User Dashboard Data",
+        description: "Main dashboard endpoint for displaying user's IoT data",
         parameters: [
           {
             name: "clerk_id",
@@ -453,6 +288,7 @@ const API_DOCS = {
             required: true,
             schema: { type: "string" },
             description: "User ID from Clerk authentication",
+            example: "user_2abc123def456",
           },
         ],
         responses: {
@@ -481,119 +317,55 @@ const API_DOCS = {
               },
             },
           },
+          "400": {
+            description: "Missing clerk_id parameter",
+          },
         },
       },
     },
     "/devices": {
-      get: {
-        tags: ["Dashboard"],
-        summary: "List user devices",
-        parameters: [
-          {
-            name: "clerk_id",
-            in: "query",
-            required: true,
-            schema: { type: "string" },
-          },
-          {
-            name: "name",
-            in: "query",
-            schema: { type: "string" },
-            description: "Filter by device name",
-          },
-          {
-            name: "is_active",
-            in: "query",
-            schema: { type: "boolean" },
-          },
-        ],
-        responses: {
-          "200": {
-            description: "Devices retrieved successfully",
-          },
-        },
-      },
       post: {
-        tags: ["Dashboard"],
-        summary: "Create new device",
+        tags: ["📱 Device Management"],
+        summary: "🔗 Connect Device to User Account",
+        description: "Create device record when user connects an IoT device",
         requestBody: {
           required: true,
           content: {
             "application/json": {
               schema: {
                 type: "object",
-                required: ["clerk_id", "email", "name"],
+                required: ["clerk_id", "name", "serial_number"],
                 properties: {
-                  clerk_id: { type: "string" },
-                  email: { type: "string", format: "email" },
-                  name: { type: "string" },
-                  location: { type: "string" },
-                  serial_number: { type: "string" },
-                  is_active: { type: "boolean", default: true },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          "201": {
-            description: "Device created successfully",
-          },
-        },
-      },
-    },
-    "/events": {
-      get: {
-        tags: ["Events"],
-        summary: "Get events",
-        parameters: [
-          {
-            name: "device_id",
-            in: "query",
-            schema: { type: "integer" },
-          },
-          {
-            name: "clerk_id",
-            in: "query",
-            schema: { type: "string" },
-          },
-          {
-            name: "event_type",
-            in: "query",
-            schema: {
-              type: "string",
-              enum: ["open", "close", "delivery", "removal"],
-            },
-          },
-          {
-            name: "limit",
-            in: "query",
-            schema: { type: "integer", default: 50 },
-          },
-        ],
-        responses: {
-          "200": {
-            description: "Events retrieved successfully",
-          },
-        },
-      },
-      post: {
-        tags: ["Events"],
-        summary: "Create event",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                required: ["device_id", "event_type", "clerk_id"],
-                properties: {
-                  device_id: { type: "integer" },
-                  event_type: {
+                  clerk_id: {
                     type: "string",
-                    enum: ["open", "close", "delivery", "removal"],
+                    description: "User ID from Clerk",
+                    example: "user_2abc123def456",
                   },
-                  clerk_id: { type: "string" },
+                  email: {
+                    type: "string",
+                    description: "User email",
+                    example: "user@example.com",
+                  },
+                  name: {
+                    type: "string",
+                    description: "Custom device name",
+                    example: "Main Mailbox Monitor",
+                  },
+                  location: {
+                    type: "string",
+                    description: "Device location",
+                    example: "Front Door Mailbox",
+                  },
+                  serial_number: {
+                    type: "string",
+                    description: "Device serial number",
+                    example: "SN001234567",
+                  },
+                  is_active: {
+                    type: "boolean",
+                    description: "Whether device is active",
+                    example: true,
+                  },
                 },
               },
             },
@@ -601,49 +373,68 @@ const API_DOCS = {
         },
         responses: {
           "201": {
-            description: "Event created successfully",
+            description: "Device connected successfully",
           },
         },
       },
     },
-    "/notifications": {
+    "/devices/{id}": {
       get: {
-        tags: ["Notifications"],
-        summary: "Get notifications",
+        tags: ["📱 Device Management"],
+        summary: "📱 Get Device Details",
         parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            description: "Device ID",
+          },
           {
             name: "clerk_id",
             in: "query",
             required: true,
             schema: { type: "string" },
-          },
-          {
-            name: "device_id",
-            in: "query",
-            schema: { type: "integer" },
-          },
-          {
-            name: "is_read",
-            in: "query",
-            schema: { type: "boolean" },
-          },
-          {
-            name: "limit",
-            in: "query",
-            schema: { type: "integer", default: 50 },
+            description: "User ID from Clerk",
           },
         ],
         responses: {
           "200": {
-            description: "Notifications retrieved successfully",
+            description: "Device details retrieved successfully",
+          },
+        },
+      },
+      delete: {
+        tags: ["📱 Device Management"],
+        summary: "🗑️ Remove Device from Account",
+        description: "Disconnect device from user account",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            description: "Device ID",
+          },
+          {
+            name: "clerk_id",
+            in: "query",
+            required: true,
+            schema: { type: "string" },
+            description: "User ID from Clerk",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Device removed successfully",
           },
         },
       },
     },
     "/init-db": {
       post: {
-        tags: ["Database"],
-        summary: "Initialize database",
+        tags: ["🔧 Setup"],
+        summary: "🗄️ Initialize Database",
         description: "Create all required database tables and schema",
         responses: {
           "200": {
@@ -670,6 +461,11 @@ const API_DOCS = {
           is_active: { type: "boolean" },
           last_seen: { type: "string", format: "date-time" },
           created_at: { type: "string", format: "date-time" },
+          is_online: { type: "boolean" },
+          battery_level: { type: "integer" },
+          signal_strength: { type: "integer" },
+          firmware_version: { type: "string" },
+          iot_last_seen: { type: "string", format: "date-time" },
         },
       },
       Event: {
@@ -704,12 +500,10 @@ export async function GET(request: NextRequest) {
   const format = searchParams.get("format") || "json";
 
   if (format === "html") {
-    // Return HTML Swagger UI
-    const html = `
-<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>Mail Guard API Documentation</title>
+  <title>Mail Guard IoT API Documentation</title>
   <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
   <style>
     html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
@@ -723,7 +517,7 @@ export async function GET(request: NextRequest) {
   <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-standalone-preset.js"></script>
   <script>
     window.onload = function() {
-      const ui = SwaggerUIBundle({
+      SwaggerUIBundle({
         url: '/api/docs?format=json',
         dom_id: '#swagger-ui',
         deepLinking: true,
@@ -748,7 +542,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Return JSON OpenAPI spec
   return NextResponse.json(API_DOCS, {
     headers: {
       "Content-Type": "application/json",

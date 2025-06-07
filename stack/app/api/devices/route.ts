@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { clerk_id, email, name, serial_number } = body;
+    const { clerk_id, email, name, serial_number, location } = body;
 
     if (!clerk_id || !name || !serial_number) {
       return NextResponse.json(
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         email || "", // Default empty email since it's not required anymore
         name,
         serial_number,
-        "Device Location", // Default location
+        location || "Device Location", // Use provided location or default
         true, // is_active
         true, // mail_delivered_notify
         true, // mailbox_opened_notify

@@ -164,17 +164,17 @@ export async function POST(request: NextRequest) {
 
       // Create notification if needed (for important events)
       if (standardEventType === "open" || standardEventType === "delivery") {
-        await executeQuery(
-          `INSERT INTO notifications (device_id, notification_type, message, sent_at)
-           VALUES (?, ?, ?, NOW())`,
-          [
-            deviceId,
-            `mailbox_${standardEventType}`,
-            `Mailbox ${
-              standardEventType === "open" ? "opened" : "delivery detected"
-            } - ${dashboardDevice[0].name || serial_number}`,
-          ]
-        );
+        try {
+          // Use simpler notification creation without message column for now
+          await executeQuery(
+            `INSERT INTO notifications (device_id, notification_type, sent_at)
+             VALUES (?, ?, NOW())`,
+            [deviceId, `mailbox_${standardEventType}`]
+          );
+        } catch (notificationError) {
+          // Log but don't fail the event if notification creation fails
+          console.log("Notification creation failed:", notificationError);
+        }
       }
 
       return NextResponse.json({

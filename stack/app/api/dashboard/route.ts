@@ -15,41 +15,139 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Get all devices for the user
+    // Get all devices for the user with IoT status
     const devices = await executeQuery<any[]>(
-      "SELECT * FROM devices WHERE clerk_id=? ORDER BY created_at DESC",
+      `SELECT d.*, 
+              ios.is_online, 
+              ios.last_seen as iot_last_seen,
+              ios.firmware_version,
+              ios.battery_level,
+              ios.signal_strength
+       FROM devices d
+       LEFT JOIN iot_device_status ios ON d.serial_number = ios.serial_number
+       WHERE d.clerk_id=? 
+       ORDER BY d.created_at DESC`,
       [clerkId]
     );
 
-    if (devices.length === 0) {
-      return NextResponse.json({
-        devices: [],
-        recent_events: [],
-        recent_images: [],
-        notification_count: 0,
-      });
-    }
-
-    // Get device IDs
+    // Get device IDs for registered devices
     const deviceIds = devices.map((device) => device.id);
 
-    // Get recent events
-    const recentEvents = await executeQuery<any[]>(
-      `SELECT * FROM mailbox_events 
-       WHERE device_id IN (?) 
-       ORDER BY occurred_at DESC 
-       LIMIT 10`,
-      [deviceIds]
+    // Get recent events from registered dashboard devices
+    let recentEvents: any[] = [];
+    if (deviceIds.length > 0) {
+      // Fix: Use proper array handling for IN clause
+      const placeholders = deviceIds.map(() => "?").join(",");
+      recentEvents = await executeQuery<any[]>(
+        `SELECT e.*, d.name as device_name, d.location as device_location
+         FROM events e
+         JOIN devices d ON e.device_id = d.id
+         WHERE e.device_id IN (${placeholders}) 
+         ORDER BY e.occurred_at DESC 
+         LIMIT 10`,
+        deviceIds
+      );
+    }
+
+    // ALSO get IoT events from devices that match claimed serials by this user
+    const userSerials = await executeQuery<any[]>(
+      `SELECT DISTINCT serial_number FROM device_serials 
+       WHERE claimed_by_clerk_id = ? OR 
+             serial_number IN (SELECT serial_number FROM devices WHERE clerk_id = ?)`,
+      [clerkId, clerkId]
     );
 
-    // Get recent images
-    const recentImages = await executeQuery<any[]>(
-      `SELECT * FROM images 
-       WHERE device_id IN (?) 
-       ORDER BY captured_at DESC 
-       LIMIT 10`,
-      [deviceIds]
-    );
+    // If user has claimed serials, get IoT events for those serials
+    if (userSerials.length > 0) {
+      const serialNumbers = userSerials.map((s) => s.serial_number);
+
+      const serialPlaceholders = serialNumbers.map(() => "?").join(",");
+      const iotEvents = await executeQuery<any[]>(
+        `SELECT ie.*, 
+                ds.device_model,
+                'IoT Device' as device_name,
+                CONCAT('Serial: ', ie.serial_number) as device_location
+         FROM iot_events ie
+         JOIN device_serials ds ON ie.serial_number = ds.serial_number
+         WHERE ie.serial_number IN (${serialPlaceholders}) 
+         ORDER BY ie.occurred_at DESC 
+         LIMIT 10`,
+        serialNumbers
+      );
+
+      // Transform IoT events to match dashboard events format
+      const transformedIotEvents = iotEvents.map((event) => ({
+        id: `iot_${event.id}`,
+        device_id: `iot_${event.serial_number}`,
+        event_type: event.event_type,
+        occurred_at: event.occurred_at,
+        device_name: event.device_name,
+        device_location: event.device_location,
+        serial_number: event.serial_number,
+        source: "iot",
+      }));
+
+      // Combine and sort all events
+      recentEvents = [...recentEvents, ...transformedIotEvents]
+        .sort(
+          (a, b) =>
+            new Date(b.occurred_at).getTime() -
+            new Date(a.occurred_at).getTime()
+        )
+        .slice(0, 20); // Show more events since we're combining sources
+    }
+
+    // Get recent images from registered dashboard devices
+    let recentImages: any[] = [];
+    if (deviceIds.length > 0) {
+      const placeholders = deviceIds.map(() => "?").join(",");
+      recentImages = await executeQuery<any[]>(
+        `SELECT i.*, d.name as device_name 
+         FROM images i
+         JOIN devices d ON i.device_id = d.id
+         WHERE i.device_id IN (${placeholders}) 
+         ORDER BY i.captured_at DESC 
+         LIMIT 10`,
+        deviceIds
+      );
+    }
+
+    // ALSO get IoT images if user has claimed serials
+    if (userSerials.length > 0) {
+      const serialNumbers = userSerials.map((s) => s.serial_number);
+      const serialPlaceholders = serialNumbers.map(() => "?").join(",");
+
+      const iotImages = await executeQuery<any[]>(
+        `SELECT ii.*, 
+                'IoT Device' as device_name
+         FROM iot_images ii
+         WHERE ii.serial_number IN (${serialPlaceholders}) 
+         ORDER BY ii.captured_at DESC 
+         LIMIT 10`,
+        serialNumbers
+      );
+
+      // Transform IoT images to match dashboard images format
+      const transformedIotImages = iotImages.map((image) => ({
+        id: `iot_${image.id}`,
+        device_id: `iot_${image.serial_number}`,
+        image_url: image.image_url,
+        captured_at: image.captured_at,
+        event_type: image.event_type,
+        device_name: image.device_name,
+        serial_number: image.serial_number,
+        source: "iot",
+      }));
+
+      // Combine and sort all images
+      recentImages = [...recentImages, ...transformedIotImages]
+        .sort(
+          (a, b) =>
+            new Date(b.captured_at).getTime() -
+            new Date(a.captured_at).getTime()
+        )
+        .slice(0, 15); // Show more images
+    }
 
     // Get notification count
     const notificationResult = await executeQuery<any[]>(

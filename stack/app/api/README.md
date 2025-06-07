@@ -1,45 +1,58 @@
 # Mail Guard API
 
-This directory contains the Next.js API routes for the Mail Guard application.
+This directory contains the Next.js API routes for the Mail Guard IoT application.
 
-## API Endpoints
+## Core Data Flow
 
-### Devices
+**IoT Device → HTTP API → User Dashboard**
 
-- `GET /api/devices?name={name}` - List devices by name
-- `POST /api/devices` - Create a new device
-- `GET /api/devices/{id}?clerk_id={clerk_id}` - Get a specific device
-- `PUT /api/devices/{id}` - Update a device
-- `DELETE /api/devices/{id}?clerk_id={clerk_id}` - Delete a device
-- `GET /api/devices/{id}/settings?clerk_id={clerk_id}` - Get device settings
-- `PUT /api/devices/{id}/settings?clerk_id={clerk_id}` - Update device settings
-- `PUT /api/devices/{id}/status` - Update device status
-- `POST /api/devices/{id}/heartbeat` - Update device last seen
-- `POST /api/devices/{id}/health` - Update device health metrics
-- `GET /api/devices/{id}/summary?clerk_id={clerk_id}` - Get a summary of a device
+1. IoT devices send events via HTTP to `/api/iot/event`
+2. Users connect devices through `/api/iot/activate` validation
+3. Dashboard displays IoT data via `/api/dashboard`
 
-### Events
+## Essential API Endpoints
 
-- `GET /api/events?device_id={device_id}&clerk_id={clerk_id}` - Get events for a device
-- `POST /api/events` - Create a new event
+### 🌐 IoT Device APIs (Core)
 
-### Images
+- **`POST /api/iot/event`** - **[MAIN]** Receive events from IoT devices (mailbox open/close, delivery, etc.)
+- **`GET /api/iot/activate?serial_number={serial}`** - Validate device serial numbers for connection
+- **`POST /api/iot/upload`** - Handle file uploads from IoT devices
+- **`POST /api/iot/report`** - Receive status reports from IoT devices
 
-- `GET /api/images?device_id={device_id}&clerk_id={clerk_id}` - Get images for a device
-- `POST /api/images` - Upload a new image
+### 📱 Device Management APIs
 
-### Notifications
+- **`POST /api/devices`** - Create device record when user connects IoT device
+- **`GET /api/devices/{id}?clerk_id={clerk_id}`** - Get specific device details
+- **`DELETE /api/devices/{id}?clerk_id={clerk_id}`** - Remove device from user account
 
-- `GET /api/notifications?device_id={device_id}&clerk_id={clerk_id}` - Get notifications for a device
-- `POST /api/notifications` - Create a new notification
+### 📊 Dashboard API
 
-### Dashboard
+- **`GET /api/dashboard?clerk_id={clerk_id}`** - Get user's IoT data including:
+  - Connected devices
+  - Recent events from IoT devices
+  - Recent images from IoT devices
+  - Notification count
 
-- `GET /api/dashboard?clerk_id={clerk_id}` - Get dashboard data for a user
+### 🔧 Setup APIs
+
+- **`POST /api/init-db`** - Initialize database with required tables
+- **`GET /api/docs`** - API documentation
+
+## IoT Event Types Supported
+
+- `open` - Mailbox opened (reed sensor triggered)
+- `close` - Mailbox closed (reed sensor released)
+- `delivery` - Mail delivered (inferred or explicit)
+- `removal` - Mail removed (inferred or explicit)
+
+## IoT Device Data Flow
+
+1. **Device Activation**: User validates serial number via `/api/iot/activate`
+2. **Device Connection**: User creates device record via `/api/devices`
+3. **Event Streaming**: IoT device sends real-time events to `/api/iot/event`
+4. **Dashboard Display**: User sees IoT data via `/api/dashboard`
 
 ## Environment Variables
-
-The API requires the following environment variables to be set:
 
 ```env
 # Database Configuration
@@ -49,11 +62,7 @@ MYSQL_USER=your_username
 MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=mailguard_db
 
-# SSL Certificate Configuration (optional)
-# If not provided, the API will automatically look for public/certs/rds-ca.pem
-# MYSQL_SSL_CA=path/to/your/certificate.pem
-
-# AWS S3 Configuration for Image Storage
+# AWS S3 Configuration for IoT Image Storage
 AWS_REGION=us-west-1
 AWS_ACCESS_KEY_ID=your_access_key_here
 AWS_SECRET_ACCESS_KEY=your_secret_key_here
@@ -64,48 +73,38 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 CLERK_SECRET_KEY=your_clerk_secret_key
 ```
 
-## SSL Certificate Configuration
+## Database Tables
 
-The application supports SSL connections to your database. There are two ways to configure SSL:
+### Core IoT Tables
 
-### Option 1: Using public/certs directory (Recommended)
+- `device_serials` - Valid IoT device serial numbers
+- `iot_device_status` - Real-time IoT device status and health
+- `iot_events` - Events from unclaimed IoT devices
+- `devices` - User-claimed IoT devices
+- `events` - Events from claimed IoT devices
+- `images` - Images from IoT devices
+- `device_health` - IoT device health metrics
+- `notifications` - User notifications from IoT events
 
-Place your SSL certificate file in `public/certs/rds-ca.pem`. The application will automatically detect and use it.
+## IoT Integration Details
 
-### Option 2: Using environment variable
+### Event Processing
 
-Set the `MYSQL_SSL_CA` environment variable to the path of your certificate file.
+- Validates device serial numbers against `device_serials` table
+- Updates device health metrics (battery, signal strength, firmware)
+- Routes events to appropriate tables based on device claim status
+- Generates notifications for important events (delivery, open)
 
-### For AWS RDS
+### Device Health Monitoring
 
-If you're using AWS RDS, download the certificate bundle from:
-https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
+- Battery level tracking
+- Signal strength monitoring
+- Firmware version management
+- Last seen timestamps
+- Online/offline status
 
-## Database Schema
+### Security
 
-The API assumes the following database tables exist:
-
-- `devices` - Stores device information
-- `mailbox_events` - Stores mailbox events (open, close, delivery, removal)
-- `images` - Stores image metadata and URLs
-- `notifications` - Stores notification records
-- `device_health` - Stores device health metrics
-
-## Troubleshooting
-
-### SSL Connection Issues
-
-If you encounter SSL connection errors:
-
-1. Ensure your certificate file is placed in `public/certs/rds-ca.pem`
-2. Check that your database server supports SSL connections
-3. Verify the certificate is valid and not expired
-4. For development, you can disable SSL by not providing any certificate
-
-### CORS Issues
-
-The API includes CORS headers for cross-origin requests. If you encounter CORS issues:
-
-1. Check the middleware configuration in `middleware.ts`
-2. Ensure your frontend domain is allowed
-3. Verify that preflight OPTIONS requests are being handled correctly
+- Serial number validation prevents unauthorized devices
+- Clerk authentication for user data access
+- Device ownership validation through `clerk_id`

@@ -159,12 +159,108 @@ export async function DELETE(
       );
     }
 
-    // Delete device (cascades to related tables)
-    await executeQuery("DELETE FROM devices WHERE id = ?", [deviceId]);
+    const device = devices[0];
+    const serialNumber = device.serial_number;
 
-    return NextResponse.json({
-      message: "Device deleted successfully",
-    });
+    console.log(
+      `Deleting device ${deviceId} with serial ${serialNumber} for user ${clerkId}`
+    );
+
+    // Start comprehensive cleanup process
+    let deletedCounts = {
+      events: 0,
+      images: 0,
+      notifications: 0,
+      health_records: 0,
+      iot_events: 0,
+      iot_images: 0,
+      iot_status: 0,
+      device_serial: 0,
+    };
+
+    try {
+      // 1. Delete dashboard-related data first
+      const eventsResult = await executeQuery(
+        "DELETE FROM events WHERE device_id = ?",
+        [deviceId]
+      );
+      deletedCounts.events = (eventsResult as any).affectedRows || 0;
+
+      const imagesResult = await executeQuery(
+        "DELETE FROM images WHERE device_id = ?",
+        [deviceId]
+      );
+      deletedCounts.images = (imagesResult as any).affectedRows || 0;
+
+      const notificationsResult = await executeQuery(
+        "DELETE FROM notifications WHERE device_id = ?",
+        [deviceId]
+      );
+      deletedCounts.notifications =
+        (notificationsResult as any).affectedRows || 0;
+
+      const healthResult = await executeQuery(
+        "DELETE FROM device_health WHERE device_id = ?",
+        [deviceId]
+      );
+      deletedCounts.health_records = (healthResult as any).affectedRows || 0;
+
+      // 2. Delete IoT-specific data if serial number exists
+      if (serialNumber) {
+        console.log(`Cleaning up IoT data for serial: ${serialNumber}`);
+
+        const iotEventsResult = await executeQuery(
+          "DELETE FROM iot_events WHERE serial_number = ?",
+          [serialNumber]
+        );
+        deletedCounts.iot_events = (iotEventsResult as any).affectedRows || 0;
+
+        const iotImagesResult = await executeQuery(
+          "DELETE FROM iot_images WHERE serial_number = ?",
+          [serialNumber]
+        );
+        deletedCounts.iot_images = (iotImagesResult as any).affectedRows || 0;
+
+        const iotStatusResult = await executeQuery(
+          "DELETE FROM iot_device_status WHERE serial_number = ?",
+          [serialNumber]
+        );
+        deletedCounts.iot_status = (iotStatusResult as any).affectedRows || 0;
+
+        // 3. Unclaim the device serial (but don't delete the serial record itself)
+        const deviceSerialResult = await executeQuery(
+          "UPDATE device_serials SET claimed_by_clerk_id = NULL, claimed_at = NULL WHERE serial_number = ? AND claimed_by_clerk_id = ?",
+          [serialNumber, clerkId]
+        );
+        deletedCounts.device_serial =
+          (deviceSerialResult as any).affectedRows || 0;
+      }
+
+      // 4. Finally delete the device record
+      await executeQuery("DELETE FROM devices WHERE id = ?", [deviceId]);
+
+      console.log("Device deletion completed:", deletedCounts);
+
+      return NextResponse.json({
+        message: "Device and all associated data deleted successfully",
+        deleted_data: deletedCounts,
+        device_id: deviceId,
+        serial_number: serialNumber,
+      });
+    } catch (cleanupError) {
+      console.error("Error during device cleanup:", cleanupError);
+      return NextResponse.json(
+        {
+          error: "Failed to completely clean up device data",
+          message:
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : "Unknown cleanup error",
+          partial_cleanup: deletedCounts,
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("Error deleting device:", error);
     return NextResponse.json(
