@@ -183,6 +183,7 @@ export async function GET(request: NextRequest) {
             firmware_version: statusInfo.firmware_version,
             battery_level: statusInfo.battery_level,
             signal_strength: statusInfo.signal_strength,
+            weight_value: statusInfo.weight_value,
           }
         : null,
     });

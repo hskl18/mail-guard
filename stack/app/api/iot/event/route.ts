@@ -31,7 +31,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate event data structure
-    const { reed_sensor, event_type, mailbox_status } = event_data;
+    const {
+      reed_sensor,
+      event_type,
+      mailbox_status,
+      weight_sensor,
+      weight_value,
+      weight_threshold,
+    } = event_data;
 
     if (reed_sensor === undefined) {
       return NextResponse.json(
@@ -59,6 +66,37 @@ export async function POST(request: NextRequest) {
 
     const serialInfo = deviceSerial[0];
 
+    // Get last weight reading for comparison (if weight sensor data provided)
+    let lastWeightReading = null;
+    let weightChange = null;
+    let itemDetected = false;
+
+    if (weight_sensor !== undefined || weight_value !== undefined) {
+      try {
+        const lastWeight = await executeQuery<any[]>(
+          `SELECT weight_value FROM iot_device_status 
+           WHERE serial_number = ? AND weight_value IS NOT NULL 
+           ORDER BY last_seen DESC LIMIT 1`,
+          [serial_number]
+        );
+
+        if (lastWeight.length > 0) {
+          lastWeightReading = lastWeight[0].weight_value;
+          if (weight_value !== undefined && lastWeightReading !== null) {
+            weightChange = weight_value - lastWeightReading;
+
+            // Item detection logic
+            const threshold = weight_threshold || 50; // Default 50g threshold
+            if (Math.abs(weightChange) >= threshold) {
+              itemDetected = true;
+            }
+          }
+        }
+      } catch (weightError) {
+        console.log("Weight comparison error:", weightError);
+      }
+    }
+
     // Update or create device status
     const existingStatus = await executeQuery<any[]>(
       "SELECT * FROM iot_device_status WHERE serial_number = ?",
@@ -73,12 +111,14 @@ export async function POST(request: NextRequest) {
              firmware_version = ?,
              battery_level = ?,
              signal_strength = ?,
+             weight_value = ?,
              is_online = 1
          WHERE serial_number = ?`,
         [
           firmware_version || existingStatus[0].firmware_version || "1.0.0",
           battery_level ?? null,
           signal_strength ?? null,
+          weight_value ?? existingStatus[0].weight_value ?? null,
           serial_number,
         ]
       );
@@ -86,19 +126,21 @@ export async function POST(request: NextRequest) {
       // Create new status record
       await executeQuery(
         `INSERT INTO iot_device_status 
-         (serial_number, firmware_version, battery_level, signal_strength, is_online, last_seen) 
-         VALUES (?, ?, ?, ?, 1, NOW())`,
+         (serial_number, firmware_version, battery_level, signal_strength, weight_value, is_online, last_seen) 
+         VALUES (?, ?, ?, ?, ?, 1, NOW())`,
         [
           serial_number,
           firmware_version || "1.0.0",
           battery_level ?? null,
           signal_strength ?? null,
+          weight_value ?? null,
         ]
       );
     }
 
-    // Map reed sensor and event type to standardized event
+    // Enhanced event type mapping with weight sensor integration
     let standardEventType = "unknown";
+    let detectionMethod = "reed_sensor";
 
     if (event_type) {
       // Use provided event type if available
@@ -114,17 +156,40 @@ export async function POST(request: NextRequest) {
         case "delivery":
         case "mail_delivered":
           standardEventType = "delivery";
+          detectionMethod = event_type.toLowerCase().includes("delivery")
+            ? "explicit"
+            : "reed_sensor";
           break;
         case "removal":
         case "mail_removed":
           standardEventType = "removal";
+          detectionMethod = event_type.toLowerCase().includes("removal")
+            ? "explicit"
+            : "reed_sensor";
+          break;
+        case "item_detected":
+        case "weight_change":
+          standardEventType = "delivery"; // Weight-based item detection maps to delivery
+          detectionMethod = "weight_sensor";
           break;
         default:
           standardEventType = reed_sensor ? "open" : "close";
       }
     } else {
-      // Infer from reed sensor status
-      standardEventType = reed_sensor ? "open" : "close";
+      // Enhanced inference logic with weight sensor
+      if (itemDetected && weightChange !== null) {
+        if (weightChange > 0) {
+          standardEventType = "delivery";
+          detectionMethod = "weight_sensor";
+        } else if (weightChange < 0) {
+          standardEventType = "removal";
+          detectionMethod = "weight_sensor";
+        }
+      } else {
+        // Fallback to reed sensor
+        standardEventType = reed_sensor ? "open" : "close";
+        detectionMethod = "reed_sensor";
+      }
     }
 
     // Check if device is claimed by a user (linked to dashboard)
@@ -149,8 +214,12 @@ export async function POST(request: NextRequest) {
         [deviceId, standardEventType, clerkId]
       );
 
-      // Store health data if provided
-      if (battery_level !== undefined || signal_strength !== undefined) {
+      // Store enhanced health data with weight information
+      if (
+        battery_level !== undefined ||
+        signal_strength !== undefined ||
+        weight_value !== undefined
+      ) {
         await executeQuery(
           `INSERT INTO device_health (device_id, clerk_id, battery_level, signal_strength, firmware_version, reported_at)
            VALUES (?, ?, ?, ?, ?, NOW())`,
@@ -270,26 +339,64 @@ export async function POST(request: NextRequest) {
         message: "Event recorded successfully",
         event_id: (eventResult as any).insertId,
         event_type: standardEventType,
+        detection_method: detectionMethod,
         device_id: deviceId,
         serial_number: serial_number,
         status: "claimed_device",
+        weight_data:
+          weight_value !== undefined
+            ? {
+                current_weight: weight_value,
+                last_weight: lastWeightReading,
+                weight_change: weightChange,
+                item_detected: itemDetected,
+                threshold_used: weight_threshold || 50,
+              }
+            : null,
         processed_at: new Date().toISOString(),
       });
     } else {
       // Store in IoT events table if device is not claimed or not linked
+      // Enhanced event data with weight information
+      const enhancedEventData = {
+        ...event_data,
+        detection_method: detectionMethod,
+        weight_data:
+          weight_value !== undefined
+            ? {
+                current_weight: weight_value,
+                last_weight: lastWeightReading,
+                weight_change: weightChange,
+                item_detected: itemDetected,
+                threshold_used: weight_threshold || 50,
+              }
+            : null,
+      };
+
       const iotEventResult = await executeQuery(
         `INSERT INTO iot_events (serial_number, event_type, event_data, occurred_at) 
          VALUES (?, ?, ?, NOW())`,
-        [serial_number, standardEventType, JSON.stringify(event_data)]
+        [serial_number, standardEventType, JSON.stringify(enhancedEventData)]
       );
 
       return NextResponse.json({
         message: "IoT event recorded (unclaimed device)",
         iot_event_id: (iotEventResult as any).insertId,
         event_type: standardEventType,
+        detection_method: detectionMethod,
         serial_number: serial_number,
         status: serialInfo.is_claimed ? "claimed_but_not_linked" : "unclaimed",
         note: "Claim device in dashboard for full integration",
+        weight_data:
+          weight_value !== undefined
+            ? {
+                current_weight: weight_value,
+                last_weight: lastWeightReading,
+                weight_change: weightChange,
+                item_detected: itemDetected,
+                threshold_used: weight_threshold || 50,
+              }
+            : null,
         processed_at: new Date().toISOString(),
       });
     }

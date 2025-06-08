@@ -68,7 +68,14 @@ const API_DOCS = {
                       },
                       event_type: {
                         type: "string",
-                        enum: ["open", "close", "delivery", "removal"],
+                        enum: [
+                          "open",
+                          "close",
+                          "delivery",
+                          "removal",
+                          "item_detected",
+                          "weight_change",
+                        ],
                         description: "Type of mailbox event",
                         example: "open",
                       },
@@ -76,6 +83,27 @@ const API_DOCS = {
                         type: "string",
                         description: "Human readable status",
                         example: "opened",
+                      },
+                      weight_sensor: {
+                        type: "boolean",
+                        description: "Whether weight sensor is present/active",
+                        example: true,
+                      },
+                      weight_value: {
+                        type: "number",
+                        format: "float",
+                        description: "Current weight reading in grams",
+                        example: 125.5,
+                        minimum: 0,
+                      },
+                      weight_threshold: {
+                        type: "number",
+                        format: "float",
+                        description:
+                          "Weight change threshold in grams for item detection (default: 50g)",
+                        example: 50,
+                        minimum: 1,
+                        default: 50,
                       },
                     },
                   },
@@ -120,11 +148,50 @@ const API_DOCS = {
                     message: { type: "string" },
                     event_id: { type: "integer" },
                     event_type: { type: "string" },
+                    detection_method: {
+                      type: "string",
+                      enum: ["reed_sensor", "weight_sensor", "explicit"],
+                      description: "Method used to detect the event",
+                    },
                     device_id: { type: "integer" },
                     serial_number: { type: "string" },
                     status: {
                       type: "string",
                       enum: ["claimed_device", "unclaimed_device"],
+                    },
+                    weight_data: {
+                      type: "object",
+                      nullable: true,
+                      description: "Weight sensor data (if available)",
+                      properties: {
+                        current_weight: {
+                          type: "number",
+                          format: "float",
+                          description: "Current weight reading in grams",
+                        },
+                        last_weight: {
+                          type: "number",
+                          format: "float",
+                          nullable: true,
+                          description: "Previous weight reading in grams",
+                        },
+                        weight_change: {
+                          type: "number",
+                          format: "float",
+                          nullable: true,
+                          description: "Change in weight since last reading",
+                        },
+                        item_detected: {
+                          type: "boolean",
+                          description:
+                            "Whether weight change exceeded threshold",
+                        },
+                        threshold_used: {
+                          type: "number",
+                          format: "float",
+                          description: "Weight threshold used for detection",
+                        },
+                      },
                     },
                     processed_at: { type: "string", format: "date-time" },
                   },
@@ -176,6 +243,12 @@ const API_DOCS = {
                         firmware_version: { type: "string" },
                         battery_level: { type: "integer" },
                         signal_strength: { type: "integer" },
+                        weight_value: {
+                          type: "number",
+                          format: "float",
+                          nullable: true,
+                          description: "Current weight reading in grams",
+                        },
                       },
                     },
                   },

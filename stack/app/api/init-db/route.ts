@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
           firmware_version VARCHAR(50),
           battery_level INT,
           signal_strength INT,
+          weight_value DECIMAL(10,3) COMMENT 'Weight in grams from load cell/weight sensor',
           is_online TINYINT(1) DEFAULT 0,
           device_type VARCHAR(50) DEFAULT 'mailbox_monitor',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
           INDEX idx_serial_number (serial_number),
           INDEX idx_last_seen (last_seen),
           INDEX idx_is_online (is_online),
+          INDEX idx_weight_value (weight_value),
           FOREIGN KEY (serial_number) REFERENCES device_serials(serial_number) ON DELETE CASCADE
         )
       `);

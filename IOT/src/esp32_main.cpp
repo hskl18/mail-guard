@@ -13,10 +13,7 @@ const char* password = WIFI_PASSWORD;
 const char* SERIES_ID = "ESP32_001"; 
 const char* apiUrl = "https://mail-guard-ten.vercel.app";
 
-// Legacy variables - can be removed if not needed elsewhere
-const char* serverIpAddress = SERVER_IP; 
-const char* serverPortChar = SERVER_PORT;
-const int serverPort = atoi(serverPortChar);
+
 
 const int REED_SW_PIN = 2;
 HardwareSerial CamSerial(2);
@@ -67,12 +64,15 @@ void sendEventToServer(String eventType) {
   http.addHeader("Content-Type", "application/json");
   
   // Create event data matching the API format
+  String reedSensorValue = (eventType == "open") ? "true" : "false";
+  String mailboxStatus = (eventType == "open") ? "opened" : "closed";
+  
   String jsonPayload = "{";
   jsonPayload += "\"serial_number\":\"" + String(SERIES_ID) + "\",";
   jsonPayload += "\"event_data\":{";
-  jsonPayload += "\"reed_sensor\":" + String(eventType == "open" ? "true" : "false") + ",";
+  jsonPayload += "\"reed_sensor\":" + reedSensorValue + ",";
   jsonPayload += "\"event_type\":\"" + eventType + "\",";
-  jsonPayload += "\"mailbox_status\":\"" + (eventType == "open" ? "opened" : "closed") + "\"";
+  jsonPayload += "\"mailbox_status\":\"" + mailboxStatus + "\"";
   jsonPayload += "},";
   jsonPayload += "\"firmware_version\":\"1.0.0\",";
   jsonPayload += "\"timestamp\":\"" + String(millis()) + "\"";

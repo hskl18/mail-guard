@@ -42,8 +42,20 @@ This directory contains the Next.js API routes for the Mail Guard IoT applicatio
 
 - `open` - Mailbox opened (reed sensor triggered)
 - `close` - Mailbox closed (reed sensor released)
-- `delivery` - Mail delivered (inferred or explicit)
-- `removal` - Mail removed (inferred or explicit)
+- `delivery` - Mail delivered (inferred from reed sensor, weight sensor, or explicit)
+- `removal` - Mail removed (inferred from reed sensor, weight sensor, or explicit)
+- `item_detected` - Item detected via weight sensor (maps to delivery)
+- `weight_change` - Weight change detected (maps to delivery/removal based on direction)
+
+## Detection Methods
+
+- **Reed Sensor**: Traditional magnetic switch detection for open/close events
+- **Weight Sensor**: Load cell/weight-based detection for item delivery/removal
+  - Configurable weight threshold (default: 50g)
+  - Automatic item detection based on weight changes
+  - Positive weight change = delivery event
+  - Negative weight change = removal event
+- **Explicit Events**: Manually specified event types from IoT device logic
 
 ## IoT Device Data Flow
 

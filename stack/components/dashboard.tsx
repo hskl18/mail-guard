@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import {
   Mail,
@@ -10,6 +10,7 @@ import {
   Building,
   X,
   Eye,
+  RefreshCw,
 } from "lucide-react";
 import {
   Card,
@@ -40,17 +41,28 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const loadDashboardData = async () => {
+  // Auto-refresh setup
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const POLLING_INTERVAL = 30000; // 30 seconds
+
+  const loadDashboardData = useCallback(
+    async (isManualRefresh = false) => {
       if (!user?.id) return;
 
-      setIsLoading(true);
+      if (isManualRefresh) {
+        setIsRefreshing(true);
+      } else if (!devices.length) {
+        setIsLoading(true);
+      }
       setError("");
 
       try {
-        // Use the Next.js API route instead of external API
-        const dashboardUrl = `/api/dashboard?clerk_id=${user.id}`;
+        const dashboardUrl = `/api/dashboard?clerk_id=${
+          user.id
+        }&t=${Date.now()}`;
         console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
         const dashboardRes = await fetch(dashboardUrl, {
@@ -58,10 +70,9 @@ export default function Dashboard() {
           headers: {
             "Content-Type": "application/json",
           },
-          cache: "no-cache", // Prevent caching issues
+          cache: "no-cache",
         });
 
-        // Process the dashboard data
         if (!dashboardRes.ok) {
           const errorText = await dashboardRes.text();
           throw new Error(
@@ -72,7 +83,6 @@ export default function Dashboard() {
         const dashboardData = await dashboardRes.json();
         console.log(`Dashboard data:`, dashboardData);
 
-        // Set all the state at once from the consolidated response
         setDevices(
           Array.isArray(dashboardData.devices) ? dashboardData.devices : []
         );
@@ -86,15 +96,12 @@ export default function Dashboard() {
             ? dashboardData.recent_images
             : []
         );
+        setLastUpdateTime(new Date());
       } catch (err: any) {
-        // Detailed error logging
         console.error("Dashboard data fetch error:", err);
-
-        // Create user-friendly error message
         const errorMessage = err.message || "Unknown error";
         setError(`Could not load dashboard data. ${errorMessage}`);
 
-        // Mock data for development
         if (process.env.NODE_ENV === "development") {
           console.log("Using mock data in development mode");
           setDevices([
@@ -118,11 +125,32 @@ export default function Dashboard() {
         }
       } finally {
         setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [user?.id, devices.length]
+  );
+
+  const handleManualRefresh = useCallback(() => {
+    loadDashboardData(true);
+  }, [loadDashboardData]);
+
+  useEffect(() => {
+    // Initial load
+    loadDashboardData();
+
+    // Set up auto-refresh
+    intervalRef.current = setInterval(() => {
+      loadDashboardData();
+    }, POLLING_INTERVAL);
+
+    // Cleanup
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
     };
-
-    loadDashboardData();
-  }, [user?.id]);
+  }, [loadDashboardData]);
 
   const handleRemoveDevice = async () => {
     if (!currentDevice || !user?.id) return;
@@ -184,11 +212,15 @@ export default function Dashboard() {
       <div className="p-6 bg-red-50 rounded-lg text-center">
         <p className="text-red-700">{error}</p>
         <Button
-          onClick={() => window.location.reload()}
+          onClick={handleManualRefresh}
           className="mt-4"
           variant="outline"
+          disabled={isRefreshing}
         >
-          Try Again
+          <RefreshCw
+            className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+          />
+          {isRefreshing ? "Refreshing..." : "Try Again"}
         </Button>
       </div>
     );
@@ -317,13 +349,33 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <Link href="/connect-device">
-          <Button variant="outline">
-            <Building className="mr-2 h-4 w-4" />
-            Connect Another Device
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-4">
+          {lastUpdateTime && (
+            <p className="text-sm text-gray-500">
+              Last updated: {lastUpdateTime.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
           </Button>
-        </Link>
+          <Link href="/connect-device">
+            <Button variant="outline">
+              <Building className="mr-2 h-4 w-4" />
+              Connect Another Device
+            </Button>
+          </Link>
+        </div>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Status Card */}
