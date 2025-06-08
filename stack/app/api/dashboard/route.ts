@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get all devices for the user with IoT status
-    const devices = await executeQuery<any[]>(
+    const devicesRaw = await executeQuery<any[]>(
       `SELECT d.*, 
               ios.is_online, 
               ios.last_seen as iot_last_seen,
@@ -29,6 +29,19 @@ export async function GET(request: NextRequest) {
        ORDER BY d.created_at DESC`,
       [clerkId]
     );
+
+    // Convert database 0/1 values to proper booleans
+    const devices = devicesRaw.map((device) => ({
+      ...device,
+      is_active: Boolean(device.is_active),
+      is_online: Boolean(device.is_online),
+      mail_delivered_notify: Boolean(device.mail_delivered_notify),
+      mailbox_opened_notify: Boolean(device.mailbox_opened_notify),
+      mail_removed_notify: Boolean(device.mail_removed_notify),
+      email_notifications: Boolean(device.email_notifications),
+      capture_image_on_open: Boolean(device.capture_image_on_open),
+      capture_image_on_delivery: Boolean(device.capture_image_on_delivery),
+    }));
 
     // Get device IDs for registered devices
     const deviceIds = devices.map((device) => device.id);

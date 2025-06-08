@@ -36,7 +36,20 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(devices[0]);
+    // Convert database 0/1 values to proper booleans
+    const device = devices[0];
+    const deviceWithBooleans = {
+      ...device,
+      is_active: Boolean(device.is_active),
+      mail_delivered_notify: Boolean(device.mail_delivered_notify),
+      mailbox_opened_notify: Boolean(device.mailbox_opened_notify),
+      mail_removed_notify: Boolean(device.mail_removed_notify),
+      email_notifications: Boolean(device.email_notifications),
+      capture_image_on_open: Boolean(device.capture_image_on_open),
+      capture_image_on_delivery: Boolean(device.capture_image_on_delivery),
+    };
+
+    return NextResponse.json(deviceWithBooleans);
   } catch (error) {
     console.error("Error fetching device settings:", error);
     return NextResponse.json(
@@ -151,9 +164,22 @@ export async function PUT(
       [deviceId]
     );
 
+    // Convert database 0/1 values to proper booleans
+    const device = updatedDevice[0];
+    const deviceWithBooleans = {
+      ...device,
+      is_active: Boolean(device.is_active),
+      mail_delivered_notify: Boolean(device.mail_delivered_notify),
+      mailbox_opened_notify: Boolean(device.mailbox_opened_notify),
+      mail_removed_notify: Boolean(device.mail_removed_notify),
+      email_notifications: Boolean(device.email_notifications),
+      capture_image_on_open: Boolean(device.capture_image_on_open),
+      capture_image_on_delivery: Boolean(device.capture_image_on_delivery),
+    };
+
     return NextResponse.json({
       message: "Device settings updated successfully",
-      settings: updatedDevice[0],
+      settings: deviceWithBooleans,
     });
   } catch (error) {
     console.error("Error updating device settings:", error);

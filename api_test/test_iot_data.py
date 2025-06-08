@@ -11,11 +11,11 @@ import random
 import time
 from datetime import datetime, timedelta
 
-# python3 test_iot_data.py --quick 6666666666
-# python3 test_iot_data.py --weight-test 6666666666
+# python3 test_iot_data.py --quick name
+# python3 test_iot_data.py --weight-test name
 
 class IoTDataGenerator:
-    def __init__(self, serial_number=None, base_url="http://localhost:3000"):
+    def __init__(self, serial_number=None, base_url="https://mail-guard-ten.vercel.app"):
         # Use a more realistic default serial number
         self.serial_number = serial_number or f"TEST_DEVICE_{random.randint(1000, 9999)}"
         self.base_url = base_url

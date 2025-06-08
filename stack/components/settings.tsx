@@ -112,18 +112,25 @@ export default function Settings() {
           // This avoids an extra API call if the dashboard data already contains these settings
           if (device) {
             setNotificationSettings({
-              mail_delivered_notify: device.mail_delivered_notify ?? true,
-              mailbox_opened_notify: device.mailbox_opened_notify ?? true,
-              mail_removed_notify: device.mail_removed_notify ?? true,
-              email_notifications: device.email_notifications ?? true,
+              mail_delivered_notify: Boolean(
+                device.mail_delivered_notify ?? true
+              ),
+              mailbox_opened_notify: Boolean(
+                device.mailbox_opened_notify ?? true
+              ),
+              mail_removed_notify: Boolean(device.mail_removed_notify ?? true),
+              email_notifications: Boolean(device.email_notifications ?? true),
             });
 
             setDeviceSettings((prev) => ({
               ...prev,
               check_interval: String(device.check_interval ?? 15),
-              capture_image_on_open: device.capture_image_on_open ?? true,
-              capture_image_on_delivery:
-                device.capture_image_on_delivery ?? true,
+              capture_image_on_open: Boolean(
+                device.capture_image_on_open ?? true
+              ),
+              capture_image_on_delivery: Boolean(
+                device.capture_image_on_delivery ?? true
+              ),
             }));
           } else {
             // If full settings aren't available in the dashboard response, fetch detailed settings
@@ -163,19 +170,26 @@ export default function Settings() {
 
       // Update notification settings
       setNotificationSettings({
-        mail_delivered_notify: settingsData.mail_delivered_notify ?? true,
-        mailbox_opened_notify: settingsData.mailbox_opened_notify ?? true,
-        mail_removed_notify: settingsData.mail_removed_notify ?? true,
-        email_notifications: settingsData.email_notifications ?? true,
+        mail_delivered_notify: Boolean(
+          settingsData.mail_delivered_notify ?? true
+        ),
+        mailbox_opened_notify: Boolean(
+          settingsData.mailbox_opened_notify ?? true
+        ),
+        mail_removed_notify: Boolean(settingsData.mail_removed_notify ?? true),
+        email_notifications: Boolean(settingsData.email_notifications ?? true),
       });
 
       // Update device settings
       setDeviceSettings((prev) => ({
         ...prev,
         check_interval: String(settingsData.check_interval ?? 15),
-        capture_image_on_open: settingsData.capture_image_on_open ?? true,
-        capture_image_on_delivery:
-          settingsData.capture_image_on_delivery ?? true,
+        capture_image_on_open: Boolean(
+          settingsData.capture_image_on_open ?? true
+        ),
+        capture_image_on_delivery: Boolean(
+          settingsData.capture_image_on_delivery ?? true
+        ),
       }));
     } catch (err: any) {
       console.error("Failed to load device settings:", err);
