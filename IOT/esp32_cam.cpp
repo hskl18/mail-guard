@@ -134,6 +134,8 @@ void captureAndSendPhotoToServer() {
   // Manually construct the multipart form data body - using serial_number like Python script
   String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"serial_number\"\r\n\r\n" +
                 String(SERIAL_NUMBER) + "\r\n" +
+                "--" + boundary + "\r\nContent-Disposition: form-data; name=\"event_type\"\r\n\r\n" +
+                "camera_trigger" + "\r\n" +
                 "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
   String tail = "\r\n--" + boundary + "--\r\n";
 

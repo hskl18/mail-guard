@@ -67,6 +67,10 @@ void sendEventToServer(String eventType) {
   String reedSensorValue = (eventType == "open") ? "true" : "false";
   String mailboxStatus = (eventType == "open") ? "opened" : "closed";
   
+  // Simulate battery level (in real implementation, read from ADC)
+  int batteryLevel = 85; // Placeholder value
+  int signalStrength = WiFi.RSSI(); // Get actual WiFi signal strength
+  
   String jsonPayload = "{";
   jsonPayload += "\"serial_number\":\"" + String(SERIES_ID) + "\",";
   jsonPayload += "\"event_data\":{";
@@ -74,7 +78,9 @@ void sendEventToServer(String eventType) {
   jsonPayload += "\"event_type\":\"" + eventType + "\",";
   jsonPayload += "\"mailbox_status\":\"" + mailboxStatus + "\"";
   jsonPayload += "},";
-  jsonPayload += "\"firmware_version\":\"1.0.0\",";
+  jsonPayload += "\"battery_level\":" + String(batteryLevel) + ",";
+  jsonPayload += "\"signal_strength\":" + String(signalStrength) + ",";
+  jsonPayload += "\"firmware_version\":\"2.0.0-esp32\",";
   jsonPayload += "\"timestamp\":\"" + String(millis()) + "\"";
   jsonPayload += "}";
   
