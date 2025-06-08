@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import {
   Bell,
-  Smartphone,
   Wifi,
   Shield,
   Save,
@@ -50,8 +49,7 @@ export default function Settings() {
     mail_delivered_notify: true,
     mailbox_opened_notify: true,
     mail_removed_notify: true,
-    push_notifications: true,
-    email_notifications: false,
+    email_notifications: true,
   });
 
   // Device settings with defaults that will be overridden by API data
@@ -117,8 +115,7 @@ export default function Settings() {
               mail_delivered_notify: device.mail_delivered_notify ?? true,
               mailbox_opened_notify: device.mailbox_opened_notify ?? true,
               mail_removed_notify: device.mail_removed_notify ?? true,
-              push_notifications: device.push_notifications ?? true,
-              email_notifications: device.email_notifications ?? false,
+              email_notifications: device.email_notifications ?? true,
             });
 
             setDeviceSettings((prev) => ({
@@ -169,8 +166,7 @@ export default function Settings() {
         mail_delivered_notify: settingsData.mail_delivered_notify ?? true,
         mailbox_opened_notify: settingsData.mailbox_opened_notify ?? true,
         mail_removed_notify: settingsData.mail_removed_notify ?? true,
-        push_notifications: settingsData.push_notifications ?? true,
-        email_notifications: settingsData.email_notifications ?? false,
+        email_notifications: settingsData.email_notifications ?? true,
       });
 
       // Update device settings
@@ -216,7 +212,6 @@ export default function Settings() {
         mail_delivered_notify: notificationSettings.mail_delivered_notify,
         mailbox_opened_notify: notificationSettings.mailbox_opened_notify,
         mail_removed_notify: notificationSettings.mail_removed_notify,
-        push_notifications: notificationSettings.push_notifications,
         email_notifications: notificationSettings.email_notifications,
         check_interval: parseInt(deviceSettings.check_interval, 10),
         capture_image_on_open: deviceSettings.capture_image_on_open,
@@ -374,26 +369,18 @@ export default function Settings() {
             <Separator />
 
             <div className="space-y-4">
-              <h3 className="text-sm font-medium">Notification Methods</h3>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Smartphone className="h-4 w-4" />
-                  <Label htmlFor="push-notifications">Push notifications</Label>
-                </div>
-                <Switch
-                  id="push-notifications"
-                  checked={notificationSettings.push_notifications}
-                  onCheckedChange={() =>
-                    handleNotificationChange("push_notifications")
-                  }
-                />
-              </div>
+              <h3 className="text-sm font-medium">Email Notifications</h3>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
-                  <Label htmlFor="email-notifications">
-                    Email notifications
-                  </Label>
+                  <div>
+                    <Label htmlFor="email-notifications">
+                      Enable email notifications
+                    </Label>
+                    <p className="text-xs text-gray-500">
+                      Receive email alerts for the events you've selected above
+                    </p>
+                  </div>
                 </div>
                 <Switch
                   id="email-notifications"
@@ -403,6 +390,23 @@ export default function Settings() {
                   }
                 />
               </div>
+              {notificationSettings.email_notifications && (
+                <div className="bg-green-50 p-3 rounded-md">
+                  <p className="text-sm text-green-700">
+                    ✅ Email notifications are enabled. You'll receive emails at{" "}
+                    <strong>{user?.primaryEmailAddress?.emailAddress}</strong>{" "}
+                    for the selected events.
+                  </p>
+                </div>
+              )}
+              {!notificationSettings.email_notifications && (
+                <div className="bg-amber-50 p-3 rounded-md">
+                  <p className="text-sm text-amber-700">
+                    ⚠️ Email notifications are disabled. You won't receive any
+                    email alerts for mailbox events.
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter>
