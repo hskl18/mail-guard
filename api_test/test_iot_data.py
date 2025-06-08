@@ -11,8 +11,11 @@ import random
 import time
 from datetime import datetime, timedelta
 
+# python3 test_iot_data.py --quick 6666666666
+# python3 test_iot_data.py --weight-test 6666666666
+
 class IoTDataGenerator:
-    def __init__(self, serial_number=None, base_url="https://mail-guard-ten.vercel.app"):
+    def __init__(self, serial_number=None, base_url="http://localhost:3000"):
         # Use a more realistic default serial number
         self.serial_number = serial_number or f"TEST_DEVICE_{random.randint(1000, 9999)}"
         self.base_url = base_url
@@ -107,13 +110,25 @@ class IoTDataGenerator:
                 
                 return True, result
             else:
-                error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
-                error_msg = error_data.get('error', f"HTTP {response.status_code}")
-                print(f"❌ Event failed: {error_msg}")
-                
-                # Special handling for common errors
-                if response.status_code == 404:
-                    print(f"💡 Tip: Device serial '{self.serial_number}' not found. Create device first or use existing serial.")
+                try:
+                    error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+                    error_msg = error_data.get('error', f"HTTP {response.status_code}")
+                    print(f"❌ Event failed: {error_msg}")
+                    
+                    # Print additional error details if available
+                    if error_data.get('message'):
+                        print(f"   Details: {error_data.get('message')}")
+                    
+                    # Special handling for common errors
+                    if response.status_code == 404:
+                        print(f"💡 Tip: Device serial '{self.serial_number}' not found. Create device first or use existing serial.")
+                    elif response.status_code == 400:
+                        print(f"💡 Tip: Check the event data format - there might be missing or invalid fields.")
+                        if verbose:
+                            print(f"   Sent data: {json.dumps(event_data, indent=2)}")
+                except json.JSONDecodeError:
+                    print(f"❌ Event failed: HTTP {response.status_code}")
+                    print(f"   Raw response: {response.text[:200]}...")
                     
                 return False, None
                 
@@ -457,25 +472,48 @@ class IoTDataGenerator:
             )
             
             if response.status_code == 200:
-                data = response.json()
-                status = data.get('status', {})
-                
-                print(f"✅ Device Status:")
-                print(f"   Serial: {data.get('serial_number')}")
-                print(f"   Valid: {data.get('is_valid')}")
-                print(f"   Claimed: {data.get('is_claimed')}")
-                print(f"   Online: {status.get('is_online', 'Unknown')}")
-                print(f"   Weight: {status.get('weight_value', 'No data')}g")
-                print(f"   Battery: {status.get('battery_level', 'Unknown')}%")
-                print(f"   Signal: {status.get('signal_strength', 'Unknown')}dBm")
-                print(f"   Model: {data.get('device_model', 'Unknown')}")
-                return True
+                try:
+                    data = response.json()
+                    if not data:
+                        print(f"❌ Empty response from server")
+                        return False
+                        
+                    status = data.get('status') if data else None
+                    
+                    print(f"✅ Device Status:")
+                    print(f"   Serial: {data.get('serial_number', 'N/A')}")
+                    print(f"   Valid: {data.get('is_valid', 'N/A')}")
+                    print(f"   Claimed: {data.get('is_claimed', 'N/A')}")
+                    print(f"   Dashboard Linked: {data.get('dashboard_linked', 'N/A')}")
+                    
+                    if status:
+                        print(f"   Online: {status.get('is_online', 'Unknown')}")
+                        print(f"   Weight: {status.get('weight_value', 'No data')}g")
+                        print(f"   Battery: {status.get('battery_level', 'Unknown')}%")
+                        print(f"   Signal: {status.get('signal_strength', 'Unknown')}dBm")
+                        print(f"   Last Seen: {status.get('last_seen', 'Unknown')}")
+                    else:
+                        print(f"   Status: No device status available (device may not be online)")
+                        
+                    print(f"   Model: {data.get('device_model', 'Unknown')}")
+                    return True
+                    
+                except json.JSONDecodeError as e:
+                    print(f"❌ Invalid JSON response: {e}")
+                    print(f"Raw response: {response.text[:200]}...")
+                    return False
+                    
             elif response.status_code == 404:
                 print(f"❌ Device not found: {self.serial_number}")
                 print("💡 You may need to create this device first or use an existing serial number")
                 return False
             else:
                 print(f"⚠️ Unable to check device status: HTTP {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"Error details: {error_data.get('error', 'Unknown error')}")
+                except:
+                    print(f"Raw error response: {response.text[:200]}...")
                 return None
                 
         except Exception as e:

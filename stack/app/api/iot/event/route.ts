@@ -92,8 +92,18 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-      } catch (weightError) {
-        console.log("Weight comparison error:", weightError);
+      } catch (weightError: any) {
+        // If weight_value column doesn't exist, skip weight comparison
+        if (
+          weightError.code === "ER_BAD_FIELD_ERROR" ||
+          weightError.message?.includes("weight_value")
+        ) {
+          console.log(
+            "Weight sensor data requested but weight_value column not available"
+          );
+        } else {
+          console.log("Weight comparison error:", weightError);
+        }
       }
     }
 
@@ -104,36 +114,33 @@ export async function POST(request: NextRequest) {
     );
 
     if (existingStatus.length > 0) {
-      // Update existing status
+      // Update existing status - skip weight_value column for now
       await executeQuery(
         `UPDATE iot_device_status 
          SET last_seen = NOW(), 
              firmware_version = ?,
              battery_level = ?,
              signal_strength = ?,
-             weight_value = ?,
              is_online = 1
          WHERE serial_number = ?`,
         [
           firmware_version || existingStatus[0].firmware_version || "1.0.0",
           battery_level ?? null,
           signal_strength ?? null,
-          weight_value ?? existingStatus[0].weight_value ?? null,
           serial_number,
         ]
       );
     } else {
-      // Create new status record
+      // Create new status record - skip weight_value column for now
       await executeQuery(
         `INSERT INTO iot_device_status 
-         (serial_number, firmware_version, battery_level, signal_strength, weight_value, is_online, last_seen) 
-         VALUES (?, ?, ?, ?, ?, 1, NOW())`,
+         (serial_number, firmware_version, battery_level, signal_strength, is_online, last_seen) 
+         VALUES (?, ?, ?, ?, 1, NOW())`,
         [
           serial_number,
           firmware_version || "1.0.0",
           battery_level ?? null,
           signal_strength ?? null,
-          weight_value ?? null,
         ]
       );
     }
