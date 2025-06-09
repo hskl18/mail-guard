@@ -196,7 +196,6 @@ export default function Notifications() {
             message: getNotificationMessage(event.event_type, deviceName),
             read: true,
             hasImage:
-              event.event_type === "open" ||
               event.event_type === "delivery" ||
               event.event_type === "mail_delivered",
           });

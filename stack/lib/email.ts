@@ -9,6 +9,7 @@ export interface EmailNotificationParams {
   eventType: string;
   timestamp: string;
   deviceId: number;
+  imageUrl?: string; // Optional image URL for delivery events
 }
 
 export async function sendEventNotification({
@@ -17,6 +18,7 @@ export async function sendEventNotification({
   eventType,
   timestamp,
   deviceId,
+  imageUrl,
 }: EmailNotificationParams): Promise<boolean> {
   try {
     // Validate required environment variables
@@ -35,7 +37,8 @@ export async function sendEventNotification({
       eventType,
       deviceName,
       timestamp,
-      deviceId
+      deviceId,
+      imageUrl
     );
 
     // Send the email using Resend
@@ -80,7 +83,8 @@ function getEmailContent(
   eventType: string,
   deviceName: string,
   timestamp: string,
-  deviceId: number
+  deviceId: number,
+  imageUrl?: string
 ): { htmlContent: string; textContent: string } {
   const eventMessage = getEventMessage(eventType);
   const formattedTime = new Date(timestamp).toLocaleString();
@@ -106,8 +110,21 @@ function getEmailContent(
           <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Device:</strong> ${deviceName}</p>
           <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Event:</strong> ${eventMessage}</p>
           <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Time:</strong> ${formattedTime}</p>
-          <p style="margin: 0; font-size: 14px; color: #666;"><strong>Device ID:</strong> #${deviceId}</p>
         </div>
+        
+        ${
+          imageUrl
+            ? `
+        <div style="text-align: center; margin: 20px 0;">
+          <h3 style="color: #2d3748; font-size: 16px; margin-bottom: 10px;">📸 Captured Image</h3>
+          <div style="border: 2px solid #e1e5e9; border-radius: 8px; padding: 10px; background: #f9f9f9;">
+            <img src="${imageUrl}" alt="Mail delivery photo" style="max-width: 100%; height: auto; border-radius: 4px; display: block; margin: 0 auto;" />
+          </div>
+          <p style="font-size: 12px; color: #666; margin-top: 5px;">Image captured at the time of delivery</p>
+        </div>
+        `
+            : ""
+        }
         
         <p style="color: #4a5568; font-size: 14px; margin: 20px 0;">
           Check your Mail Guard dashboard for more details and recent activity.
@@ -137,7 +154,11 @@ Mail Guard Alert
 Device: ${deviceName}
 Event: ${eventMessage}
 Time: ${formattedTime}
-Device ID: #${deviceId}
+Device ID: #${deviceId}${
+    imageUrl
+      ? "\n\n📸 A photo was captured during this event. View it in your dashboard."
+      : ""
+  }
 
 Check your Mail Guard dashboard for more details and recent activity.
 

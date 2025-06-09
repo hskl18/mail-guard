@@ -20,19 +20,6 @@ const unsigned long triggerCooldown = 5000;
 
 void setup() {
   Serial.begin(115200);
-
-  /*
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
-  */
-
   Serial.println("[esp32_cam] Attempting to connect to Enterprise WiFi...");
 
   // Create a local instance of the ECE140_WIFI class
@@ -135,7 +122,7 @@ void captureAndSendPhotoToServer() {
   String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"serial_number\"\r\n\r\n" +
                 String(SERIAL_NUMBER) + "\r\n" +
                 "--" + boundary + "\r\nContent-Disposition: form-data; name=\"event_type\"\r\n\r\n" +
-                "camera_trigger" + "\r\n" +
+                "delivery" + "\r\n" +  // Note: Only "delivery" events support image uploads
                 "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
   String tail = "\r\n--" + boundary + "--\r\n";
 
@@ -177,79 +164,3 @@ void captureAndSendPhotoToServer() {
   http.end();
   esp_camera_fb_return(fb);
 }
-
-
-/*
-void captureAndSendPhotoToServer() {
-  if(WiFi.status() != WL_CONNECTED){
-    Serial.println("WiFi not connected. Cannot send photo.");
-    return;
-  }
-
-  camera_fb_t * fb = esp_camera_fb_get();
-  if (!fb) {
-    Serial.println("Camera capture failed");
-    return;
-  }
-
-  HTTPClient http;
-  WiFiClient client; 
-
-  if (imageUploadUrl == "") { 
-    Serial.println("Image Upload URL is not set. Skipping send.");
-    if (fb) esp_camera_fb_return(fb);
-    return;
-  }
-
-  Serial.print("Sending image to: ");
-  Serial.println(imageUploadUrl);
-  
-  // For HTTPS URLs, we need to use a secure client instead
-  if (imageUploadUrl.startsWith("https://")) {
-    Serial.println("HTTPS URL detected, but ESP32-CAM doesn't support HTTPS without additional libraries.");
-    Serial.println("Will use HTTP instead. Make sure your API supports HTTP uploads.");
-    // In a real-world scenario, you'd want to use WiFiClientSecure with certificates
-  }
-  
-  http.begin(client, imageUploadUrl); 
-  
-  // The API expects multipart form data with fields for 'device_id' and 'file'
-  String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-  String contentType = "multipart/form-data; boundary=" + boundary;
-  http.addHeader("Content-Type", contentType);
-  
-  // Create the multipart form data manually with device_id field first
-  String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"device_id\"\r\n\r\n" + 
-                String(deviceId) + "\r\n" +
-                "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"esp32cam.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
-  String tail = "\r\n--" + boundary + "--\r\n";
-  
-  // Calculate the total size for Content-Length header
-  uint32_t imageLen = fb->len;
-  uint32_t totalLen = head.length() + imageLen + tail.length();
-  http.addHeader("Content-Length", String(totalLen));
-  
-  // Use beginRequest/write instead of POST for more control
-  http.beginRequest();
-  http.write((uint8_t*)head.c_str(), head.length());
-  http.write(fb->buf, fb->len);
-  http.write((uint8_t*)tail.c_str(), tail.length());
-  
-  // Get the response
-  int httpResponseCode = http.endRequest();
-
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    Serial.println(response);
-  } else {
-    Serial.print("Error on sending POST: ");
-    Serial.println(httpResponseCode);
-    Serial.printf("HTTP error: %s\n", http.errorToString(httpResponseCode).c_str());
-  }
-
-  http.end();
-  esp_camera_fb_return(fb);
-}
-*/

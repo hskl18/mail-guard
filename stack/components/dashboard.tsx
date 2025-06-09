@@ -474,8 +474,7 @@ export default function Dashboard() {
                           )}
                         </div>
                       </div>
-                      {(event.event_type === "open" ||
-                        event.event_type === "delivery") && (
+                      {event.event_type === "delivery" && (
                         <Button
                           variant="ghost"
                           size="sm"
