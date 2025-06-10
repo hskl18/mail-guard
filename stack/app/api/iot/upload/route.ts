@@ -18,19 +18,8 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const serialNumber = formData.get("serial_number") as string;
-    const eventType = (formData.get("event_type") as string) || "delivery";
+    const eventType = (formData.get("event_type") as string) || "general";
     const timestamp = formData.get("timestamp") as string;
-
-    // Validate that image uploads are only for delivery events
-    if (eventType !== "delivery" && eventType !== "mail_delivered") {
-      return NextResponse.json(
-        {
-          error: "Image uploads are only supported for delivery events",
-          hint: "Use event_type='delivery' for mail delivery photos",
-        },
-        { status: 400 }
-      );
-    }
 
     if (!file) {
       return NextResponse.json(
@@ -114,16 +103,17 @@ export async function POST(request: NextRequest) {
       if (dashboardDevice.length > 0) {
         // Store in main images table if dashboard device exists
         const deviceId = dashboardDevice[0].id;
-        const clerkId = dashboardDevice[0].clerk_id;
 
-        // Create a new event for this image upload
-        const eventResult = await executeQuery(
-          `INSERT INTO events (device_id, event_type, clerk_id, occurred_at) 
-           VALUES (?, ?, ?, NOW())`,
-          [deviceId, eventType, clerkId]
+        // Find related event if exists (within last 5 minutes)
+        const recentEvent = await executeQuery<any[]>(
+          `SELECT id FROM events 
+           WHERE device_id = ? AND event_type = ? 
+           AND occurred_at >= NOW() - INTERVAL 5 MINUTE
+           ORDER BY occurred_at DESC LIMIT 1`,
+          [deviceId, eventType]
         );
 
-        const eventId = (eventResult as any).insertId;
+        const eventId = recentEvent.length > 0 ? recentEvent[0].id : null;
 
         // Try inserting with event_id first, fallback without it if column doesn't exist
         try {
@@ -144,70 +134,6 @@ export async function POST(request: NextRequest) {
           } else {
             throw dbError;
           }
-        }
-
-        // Send email notification if user has email notifications enabled for this event type
-        try {
-          // Get device notification preferences
-          const userDevice = await executeQuery<any[]>(
-            `SELECT name, email_notifications, mail_delivered_notify, mailbox_opened_notify, mail_removed_notify 
-             FROM devices WHERE id = ?`,
-            [deviceId]
-          );
-
-          if (userDevice.length > 0) {
-            const device = userDevice[0];
-            const shouldSendEmail = device.email_notifications === 1;
-
-            // Check if user wants notifications for delivery events (only type supported for image uploads)
-            let shouldSendForEventType = false;
-            if (
-              (eventType === "delivery" || eventType === "mail_delivered") &&
-              device.mail_delivered_notify === 1
-            ) {
-              shouldSendForEventType = true;
-            }
-
-            if (shouldSendEmail && shouldSendForEventType) {
-              // Get user's email from Clerk
-              const { clerkClient } = await import("@clerk/nextjs/server");
-              const client = await clerkClient();
-              const user = await client.users.getUser(clerkId);
-              const userEmail = user.primaryEmailAddress?.emailAddress;
-
-              if (userEmail) {
-                const { sendEventNotification } = await import("@/lib/email");
-
-                console.log(
-                  `Sending email notification for ${eventType} event with image to ${userEmail}`
-                );
-
-                // Create image proxy URL for email
-                const imageId = (imageRecord as any).insertId;
-                const baseUrl =
-                  process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-                const imageProxyUrl = `${baseUrl}/api/image/${imageId}`;
-
-                const emailSent = await sendEventNotification({
-                  to: userEmail,
-                  deviceName: device.name || "Your Mailbox",
-                  eventType: eventType,
-                  timestamp: new Date().toISOString(),
-                  deviceId: deviceId,
-                  imageUrl: imageProxyUrl, // Use image proxy URL instead of direct S3
-                });
-
-                if (emailSent) {
-                  console.log(
-                    `Email notification sent successfully for device ${deviceId} with image`
-                  );
-                }
-              }
-            }
-          }
-        } catch (emailError) {
-          // Log but don't fail the upload if email sending fails
-          console.error("Email notification error:", emailError);
         }
 
         return NextResponse.json(
