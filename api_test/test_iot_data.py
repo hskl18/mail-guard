@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-IoT Fake Data Generator
-Generate realistic fake data for IoT device testing and development
-Now includes email notification testing and weight sensor functionality!
+IoT Quick Test Generator
+Simple test script for Mail Guard IoT device testing
+Generates 4 core events: delivery (with image), open, removal, close
 """
 
 import requests
@@ -11,15 +11,13 @@ import random
 import time
 from datetime import datetime, timedelta
 
-# python3 test_iot_data.py --quick name
-# python3 test_iot_data.py --weight-test name
-# python test_iot_data.py --quick 6666666666
+# python3 test_iot_data.py
 
 class IoTDataGenerator:
-    # def __init__(self, serial_number=None, base_url="https://mail-guard-ten.vercel.app"):
     def __init__(self, serial_number=None, base_url="http://localhost:3000"):
-        # Use a more realistic default serial number
-        self.serial_number = serial_number or f"TEST_DEVICE_{random.randint(1000, 9999)}"
+    # def __init__(self, serial_number=None, base_url="https://mail-guard-ten.vercel.app"):
+        # Use a specific default serial number for testing
+        self.serial_number = serial_number or "6666666666"
         self.base_url = base_url
         self.demo_image_path = "demo.jpg"
         
@@ -29,10 +27,8 @@ class IoTDataGenerator:
         self.last_event_time = datetime.now()
         self.current_weight = 0.0  # Weight sensor state
         
-        print(f"🚀 IoT Data Generator for device: {self.serial_number}")
+        print(f"🚀 IoT Quick Test for device: {self.serial_number}")
         print(f"🌐 Target API: {self.base_url}")
-        print(f"📧 Email notifications will be tested if device is claimed and user email available in Clerk")
-        print(f"⚖️ Weight sensor functionality included")
 
     def send_event(self, event_type=None, add_image=False, verbose=True, weight_data=None):
         """Send a single IoT event with optional weight sensor data"""
@@ -105,8 +101,8 @@ class IoTDataGenerator:
                     
                     print(f"✅ {event_type.upper()} event sent (ID: {event_id}, Method: {detection_method}){weight_info}{email_note}")
                 
-                # Upload image for certain events
-                if add_image and event_type in ['open', 'delivery']:
+                # Upload image only for delivery events (mail delivered)
+                if add_image and event_type == 'delivery':
                     time.sleep(0.5)  # Small delay
                     self.upload_image(event_type)
                 
@@ -138,110 +134,10 @@ class IoTDataGenerator:
             print(f"❌ Event error: {e}")
             return False, None
 
-    def send_weight_event(self, weight_value, event_type=None, threshold=50, verbose=True):
-        """Send weight sensor event to IoT API"""
-        weight_data = {
-            'weight_value': weight_value,
-            'weight_threshold': threshold
-        }
-        
-        # If no event type specified, let the API infer from weight change
-        return self.send_event(event_type, add_image=False, verbose=verbose, weight_data=weight_data)
 
-    def simulate_mail_delivery_scenario(self):
-        """Simulate a complete mail delivery scenario with weight sensor"""
-        print(f"\n📬 === MAIL DELIVERY SIMULATION (Weight Sensor) ===")
-        print("Scenario: Small letter (25g) and package (180g) delivered")
-        
-        print(f"\n1️⃣ Initial state - Empty mailbox")
-        self.send_weight_event(0.0)
-        time.sleep(2)
-        
-        print(f"\n2️⃣ Small letter delivered (+25g) - Below threshold")
-        self.send_weight_event(25.0)
-        time.sleep(2)
-        
-        print(f"\n3️⃣ Package delivered (+180g) - Above threshold")
-        self.send_weight_event(205.0)  # 25g letter + 180g package
-        time.sleep(2)
-        
-        print(f"\n4️⃣ Letter removed (-25g) - Below threshold")
-        self.send_weight_event(180.0)
-        time.sleep(2)
-        
-        print(f"\n5️⃣ Package removed (-180g) - Above threshold")
-        self.send_weight_event(0.0)
-        
-    def test_custom_thresholds(self):
-        """Test different weight thresholds"""
-        print(f"\n⚖️ === CUSTOM THRESHOLD TESTING ===")
-        
-        scenarios = [
-            {"weight": 30.0, "threshold": 25, "expected": "detected"},
-            {"weight": 20.0, "threshold": 25, "expected": "not detected"},
-            {"weight": 100.0, "threshold": 75, "expected": "detected"},
-            {"weight": 15.0, "threshold": 10, "expected": "detected"},
-        ]
-        
-        # Start with empty mailbox
-        self.send_weight_event(0.0, verbose=False)
-        time.sleep(1)
-        
-        for i, scenario in enumerate(scenarios, 1):
-            print(f"\n{i}️⃣ Testing: {scenario['weight']}g with {scenario['threshold']}g threshold")
-            print(f"   Expected: {scenario['expected']}")
-            self.send_weight_event(
-                scenario['weight'], 
-                threshold=scenario['threshold']
-            )
-            time.sleep(1.5)
-    
-    def test_explicit_weight_events(self):
-        """Test explicit weight-based event types"""
-        print(f"\n🎯 === EXPLICIT WEIGHT EVENT TESTING ===")
-        
-        # Reset to empty
-        self.send_weight_event(0.0, verbose=False)
-        time.sleep(1)
-        
-        print(f"\n1️⃣ Explicit 'item_detected' event")
-        self.send_weight_event(75.0, event_type="item_detected")
-        time.sleep(2)
-        
-        print(f"\n2️⃣ Explicit 'weight_change' event")
-        self.send_weight_event(150.0, event_type="weight_change")
-        time.sleep(2)
-        
-        print(f"\n3️⃣ Explicit 'delivery' with weight data")
-        self.send_weight_event(200.0, event_type="delivery")
-        time.sleep(2)
-        
-        print(f"\n4️⃣ Explicit 'removal' with weight data")
-        self.send_weight_event(50.0, event_type="removal")
 
-    def test_weight_sensor_full_suite(self):
-        """Run all weight sensor tests"""
-        print(f"\n🧪 === WEIGHT SENSOR TEST SUITE ===")
-        print(f"=" * 50)
-        
-        # Check initial device status
-        self.check_device_status()
-        
-        # Run weight sensor test scenarios
-        self.simulate_mail_delivery_scenario()
-        time.sleep(3)
-        
-        self.test_custom_thresholds()
-        time.sleep(3)
-        
-        self.test_explicit_weight_events()
-        time.sleep(2)
-        
-        print(f"\n✅ Weight sensor testing completed!")
-        print(f"📊 Check your dashboard to see the weight-detected events")
-
-    def upload_image(self, event_type="general"):
-        """Upload a demo image"""
+    def upload_image(self, event_type="delivery"):
+        """Upload a demo image - only for delivery events"""
         try:
             with open(self.demo_image_path, 'rb') as img_file:
                 files = {'file': ('demo.jpg', img_file, 'image/jpeg')}
@@ -271,195 +167,47 @@ class IoTDataGenerator:
             print(f"❌ Image upload error: {e}")
             return False, None
 
-    def test_email_notifications(self):
-        """Specifically test email notification events"""
-        print(f"\n📧 Testing Email Notification Events")
-        print("=" * 50)
-        print("This will send events that should trigger email notifications:")
-        print("- Mail delivery (if mail_delivered_notify enabled)")
-        print("- Mailbox opened (if mailbox_opened_notify enabled)")
-        print("- Mail removal (if mail_removed_notify enabled)")
-        print()
-        print("📋 Email Architecture:")
-        print("- Email address: Retrieved from Clerk user profile (primaryEmailAddress)")
-        print("- Notification preferences: Stored in devices table")
-        print("- API: Uses clerkClient().users.getUser(clerkId) to get email")
-        print()
-        print("✅ Emails will only be sent if:")
-        print("- Device is claimed and linked to dashboard")
-        print("- User has email_notifications enabled")
-        print("- User has specific event notifications enabled")
-        print("- User has valid email address in Clerk profile (primaryEmailAddress)")
-        print()
-        
-        email_test_events = [
-            ('delivery', '📬 Testing mail delivery notification'),
-            ('open', '📭 Testing mailbox opened notification'),
-            ('removal', '📮 Testing mail removal notification'),
-        ]
-        
-        successes = 0
-        for event_type, description in email_test_events:
-            print(f"\n{description}")
-            success, result = self.send_event(event_type, add_image=True, verbose=True)
-            if success:
-                successes += 1
-            time.sleep(2)  # Give time for email processing
-        
-        print(f"\n📊 Email Test Summary:")
-        print(f"   Events sent: {successes}/{len(email_test_events)}")
-        print(f"   Battery level: {self.battery_level}%")
-        print(f"\n💡 Check your email (from Clerk profile) and server logs to confirm email delivery!")
-        
-        return successes
 
-    def generate_daily_activity(self, num_events=10, include_weight=False):
-        """Generate a realistic day of mailbox activity"""
-        print(f"\n📬 Generating {num_events} events for daily activity...")
-        if include_weight:
-            print("⚖️ Including weight sensor data in events")
+
+    def test_minimal_events(self):
+        """Generate one of each core event type - simplified test"""
+        print(f"\n📬 Testing Core Events (Minimal)")
+        print("=" * 40)
         
         events_created = 0
         images_uploaded = 0
         
-        # Typical daily sequence with email-triggering events
-        daily_events = [
-            ('delivery', '📬 Morning mail delivery (Email trigger)'),
-            ('open', '📭 Check mail after work (Email trigger)'),
-            ('removal', '📮 Take mail out (Email trigger)'),
-            ('close', '📫 Close mailbox'),
+        # Core events - one of each type
+        core_events = [
+            ('delivery', '📬 Mail delivered (with image & email)'),
+            ('open', '📭 Mailbox opened (email only)'),
+            ('removal', '📮 Mail removed (email only)'),
+            ('close', '📫 Mailbox closed'),
         ]
         
-        # Send typical sequence first
-        for event_type, description in daily_events:
-            print(f"\n📋 {description}")
+        for event_type, description in core_events:
+            print(f"\n{description}")
             
-            weight_data = None
-            if include_weight:
-                # Simulate realistic weight changes
-                if event_type == 'delivery':
-                    weight_data = {'weight_value': self.current_weight + random.uniform(50, 200), 'weight_threshold': 50}
-                elif event_type == 'removal':
-                    weight_data = {'weight_value': max(0, self.current_weight - random.uniform(30, 150)), 'weight_threshold': 50}
-                else:
-                    weight_data = {'weight_value': self.current_weight, 'weight_threshold': 50}
+            # Only delivery events get images
+            add_image = (event_type == 'delivery')
+            success, result = self.send_event(event_type, add_image=add_image, verbose=True)
             
-            success, result = self.send_event(event_type, add_image=True, weight_data=weight_data)
-            if success:
-                events_created += 1
-                if event_type in ['delivery', 'open']:
-                    images_uploaded += 1
-            time.sleep(1)
-        
-        # Fill remaining with random events
-        remaining = max(0, num_events - len(daily_events))
-        for i in range(remaining):
-            print(f"\n🎲 Random event {i+1}/{remaining}")
-            event_type = random.choice(['open', 'close', 'delivery', 'removal'])
-            add_image = random.random() < 0.3  # 30% chance of image
-            
-            weight_data = None
-            if include_weight:
-                # Random weight variations
-                if event_type == 'delivery':
-                    weight_data = {'weight_value': self.current_weight + random.uniform(20, 100), 'weight_threshold': 50}
-                elif event_type == 'removal':
-                    weight_data = {'weight_value': max(0, self.current_weight - random.uniform(20, 80)), 'weight_threshold': 50}
-                else:
-                    weight_data = {'weight_value': self.current_weight + random.uniform(-5, 5), 'weight_threshold': 50}
-            
-            success, result = self.send_event(event_type, add_image, weight_data=weight_data)
             if success:
                 events_created += 1
                 if add_image:
                     images_uploaded += 1
-            time.sleep(0.5)
+            
+            time.sleep(1)  # Brief pause between events
         
-        print(f"\n📊 Generation Summary:")
-        print(f"   Events Created: {events_created}")
-        print(f"   Images Uploaded: {images_uploaded}")
-        print(f"   Battery Level: {self.battery_level}%")
-        print(f"   Current Weight: {self.current_weight}g" if include_weight else "")
+        print(f"\n📊 Test Summary:")
+        print(f"   ✅ Events Created: {events_created}/4")
+        print(f"   📸 Images Uploaded: {images_uploaded}")
+        print(f"   🔋 Battery Level: {self.battery_level}%")
         print(f"   📧 Email notifications sent for delivery/open/removal events (if enabled)")
         
         return events_created, images_uploaded
 
-    def simulate_device_activity(self, duration_minutes=5, include_weight=False):
-        """Simulate continuous device activity for testing"""
-        print(f"\n⏱️  Simulating device activity for {duration_minutes} minutes...")
-        print("This includes email notification events mixed with regular activity.")
-        if include_weight:
-            print("⚖️ Weight sensor data will be included")
-        
-        end_time = datetime.now() + timedelta(minutes=duration_minutes)
-        events_sent = 0
-        email_events_sent = 0
-        
-        while datetime.now() < end_time:
-            # Random event every 30-120 seconds
-            wait_time = random.randint(30, 120)
-            
-            # Higher chance of email-triggering events for testing
-            email_events = ['delivery', 'open', 'removal']
-            regular_events = ['close']
-            
-            if random.random() < 0.6:  # 60% chance of email event
-                event_type = random.choice(email_events)
-                email_events_sent += 1
-            else:
-                event_type = random.choice(regular_events)
-            
-            weight_data = None
-            if include_weight:
-                # Simulate weight changes during activity
-                if event_type == 'delivery':
-                    weight_data = {'weight_value': self.current_weight + random.uniform(30, 150), 'weight_threshold': 50}
-                elif event_type == 'removal':
-                    weight_data = {'weight_value': max(0, self.current_weight - random.uniform(25, 100)), 'weight_threshold': 50}
-                else:
-                    weight_data = {'weight_value': self.current_weight + random.uniform(-2, 2), 'weight_threshold': 50}
-            
-            success, _ = self.send_event(event_type, add_image=random.random() < 0.2, weight_data=weight_data)
-            
-            if success:
-                events_sent += 1
-            
-            weight_info = f", Weight: {self.current_weight:.1f}g" if include_weight else ""
-            print(f"⏳ Waiting {wait_time}s for next event... (Total: {events_sent}, Email events: {email_events_sent}{weight_info})")
-            time.sleep(wait_time)
-        
-        print(f"✅ Simulation completed. Total events: {events_sent}, Email events: {email_events_sent}")
-        if include_weight:
-            print(f"🏁 Final weight: {self.current_weight:.1f}g")
-        return events_sent
 
-    def explain_email_system(self):
-        """Explain how the email notification system works"""
-        print(f"\n📧 Email Notification System Architecture")
-        print("=" * 55)
-        print("🏗️  System Design:")
-        print("   • Email Address: Retrieved from Clerk user profile")
-        print("   • Notification Settings: Stored in devices table")
-        print("   • Email Service: MailerSend API")
-        print()
-        print("🔄 Email Flow:")
-        print("   1. IoT device sends event → /api/iot/event")
-        print("   2. Get device notification preferences from database")
-        print("   3. Get user email from Clerk: clerkClient().users.getUser(clerkId)")
-        print("   4. Check: email_notifications + specific event notification enabled")
-        print("   5. Send email via MailerSend if all conditions met")
-        print()
-        print("⚙️  Required Environment Variables:")
-        print("   • MAILERSEND_API_KEY")
-        print("   • MAILERSEND_FROM_EMAIL") 
-        print("   • MAILERSEND_FROM_NAME")
-        print("   • CLERK_SECRET_KEY (for server-side API)")
-        print()
-        print("📋 Event Types That Trigger Emails:")
-        print("   • delivery → mail_delivered_notify")
-        print("   • open → mailbox_opened_notify") 
-        print("   • removal → mail_removed_notify")
-        print()
         
     def check_device_status(self):
         """Check if the device exists and is properly configured"""
@@ -523,84 +271,34 @@ class IoTDataGenerator:
             return None
 
 def main():
-    """Main function for generating fake IoT data"""
-    print("🎯 IoT Fake Data Generator v3.0 - Email + Weight Sensor Testing!")
-    print("=" * 70)
+    """Main function for running quick IoT test"""
+    print("🎯 IoT Quick Test - Core Events!")
+    print("=" * 35)
     
-    # Use a default serial that's likely to exist for testing
-    generator = IoTDataGenerator("TEST_DEVICE_001")
+    # Use the default serial number for testing
+    generator = IoTDataGenerator("6666666666")
     
-    # Check device status first
-    generator.check_device_status()
+    # Run the test
+    events, images = generator.test_minimal_events()
     
-    # Generate a day's worth of activity including email events
-    events, images = generator.generate_daily_activity(15)
-    
-    print(f"\n🎉 Fake data generation completed!")
-    print(f"📍 Check the dashboard at: http://localhost:3000/dashboard")
-    print(f"🔗 Device connect page: http://localhost:3000/connect-device")
-    print(f"📧 Email notifications: Check your Clerk profile email and server logs!")
+    print(f"\n🎉 Test completed!")
+    print(f"📍 Check dashboard: http://localhost:3000/dashboard")
+    print(f"📧 Check your email for delivery notification with image!")
 
 if __name__ == "__main__":
     import sys
     
     if len(sys.argv) > 1:
-        if sys.argv[1] == "--email-test":
-            # Email notification testing mode
-            serial = sys.argv[2] if len(sys.argv) > 2 else "TEST_DEVICE_001"
-            generator = IoTDataGenerator(serial)
-            generator.check_device_status()
-            generator.test_email_notifications()
-        elif sys.argv[1] == "--weight-test":
-            # Weight sensor testing mode
-            serial = sys.argv[2] if len(sys.argv) > 2 else "ESP32_WEIGHT_001"
-            generator = IoTDataGenerator(serial)
-            generator.check_device_status()
-            generator.test_weight_sensor_full_suite()
-        elif sys.argv[1] == "--weight-delivery":
-            # Weight sensor delivery scenario
-            serial = sys.argv[2] if len(sys.argv) > 2 else "ESP32_WEIGHT_001"
-            generator = IoTDataGenerator(serial)
-            generator.simulate_mail_delivery_scenario()
-        elif sys.argv[1] == "--weight-threshold":
-            # Weight sensor threshold testing
-            serial = sys.argv[2] if len(sys.argv) > 2 else "ESP32_WEIGHT_001"
-            generator = IoTDataGenerator(serial)
-            generator.test_custom_thresholds()
-        elif sys.argv[1] == "--simulate":
-            # Continuous simulation mode
-            duration = int(sys.argv[2]) if len(sys.argv) > 2 else 5
-            serial = sys.argv[3] if len(sys.argv) > 3 else "TEST_DEVICE_001"
-            include_weight = "--weight" in sys.argv
-            generator = IoTDataGenerator(serial)
-            generator.simulate_device_activity(duration, include_weight)
-        elif sys.argv[1] == "--quick":
-            # Quick test mode
-            serial = sys.argv[2] if len(sys.argv) > 2 else "TEST_DEVICE_001"
-            include_weight = "--weight" in sys.argv
-            generator = IoTDataGenerator(serial)
-            generator.generate_daily_activity(5, include_weight)
-        elif sys.argv[1] == "--check":
+        if sys.argv[1] == "--check":
             # Check device status
-            serial = sys.argv[2] if len(sys.argv) > 2 else "TEST_DEVICE_001"
+            serial = sys.argv[2] if len(sys.argv) > 2 else "6666666666"
             generator = IoTDataGenerator(serial)
             generator.check_device_status()
-        elif sys.argv[1] == "--explain-email":
-            # Explain email system
-            generator = IoTDataGenerator()
-            generator.explain_email_system()
         else:
             print("Usage:")
-            print("  python3 test_iot_data.py                        # Generate 15 events")
-            print("  python3 test_iot_data.py --email-test [SN]      # Test email notifications")
-            print("  python3 test_iot_data.py --weight-test [SN]     # Test weight sensor (full suite)")
-            print("  python3 test_iot_data.py --weight-delivery [SN] # Test weight delivery scenario")
-            print("  python3 test_iot_data.py --weight-threshold [SN]# Test weight thresholds")
-            print("  python3 test_iot_data.py --quick [SN] [--weight]# Generate 5 events")
-            print("  python3 test_iot_data.py --simulate 10 [SN] [--weight] # Simulate for 10 minutes")
+            print("  python3 test_iot_data.py                        # Run quick test (4 core events)")
             print("  python3 test_iot_data.py --check [SN]           # Check device status")
-            print("  python3 test_iot_data.py --explain-email        # Explain email system architecture")
-            print("  [SN] = Serial Number (optional, defaults vary)")
-            print("  --weight = Include weight sensor data in events")
+            print("  [SN] = Serial Number (optional, defaults to 6666666666)")
+            print("  📸 Note: Only delivery events include images in emails")
     else:
         main() 
