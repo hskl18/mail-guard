@@ -68,92 +68,117 @@ export default function Settings() {
     capture_image_on_delivery: true,
   });
 
-  // Load devices and settings on component mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      if (!user?.id) return;
+  // Function to load settings data
+  const loadSettings = async () => {
+    if (!user?.id) return;
 
-      setIsLoading(true);
-      setError("");
+    setIsLoading(true);
+    setError("");
 
-      try {
-        // Use the Next.js API route for dashboard data
-        const dashboardUrl = `/api/dashboard?clerk_id=${user.id}`;
-        console.log(`Fetching dashboard data from: ${dashboardUrl}`);
+    // Clear previous device state when reloading
+    setDevices([]);
+    setCurrentDevice(null);
 
-        const dashboardRes = await fetch(dashboardUrl, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          cache: "no-cache",
-        });
+    try {
+      // Use the Next.js API route for dashboard data
+      const dashboardUrl = `/api/dashboard?clerk_id=${user.id}&t=${Date.now()}`;
+      console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
-        if (!dashboardRes.ok) {
-          throw new Error(
-            `Failed to fetch dashboard data: ${dashboardRes.status}`
-          );
-        }
+      const dashboardRes = await fetch(dashboardUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-cache",
+      });
 
-        const dashboardData = await dashboardRes.json();
-        console.log("Dashboard data:", dashboardData);
+      if (!dashboardRes.ok) {
+        throw new Error(
+          `Failed to fetch dashboard data: ${dashboardRes.status}`
+        );
+      }
 
-        const devicesList = Array.isArray(dashboardData.devices)
-          ? dashboardData.devices
-          : [];
-        setDevices(devicesList);
+      const dashboardData = await dashboardRes.json();
+      console.log("Dashboard data:", dashboardData);
 
-        // If we have devices, load settings for the first one
-        if (devicesList.length > 0) {
-          const device = devicesList[0];
-          setCurrentDevice(device);
+      const devicesList = Array.isArray(dashboardData.devices)
+        ? dashboardData.devices
+        : [];
+      setDevices(devicesList);
 
-          // Set basic device info
+      // If we have devices, load settings for the first one
+      if (devicesList.length > 0) {
+        const device = devicesList[0];
+        setCurrentDevice(device);
+
+        // Set basic device info
+        setDeviceSettings((prev) => ({
+          ...prev,
+          name: device.name || "",
+          location: device.location || "",
+        }));
+
+        // Extract settings from the device object directly if available
+        // This avoids an extra API call if the dashboard data already contains these settings
+        if (device) {
+          setNotificationSettings({
+            mail_delivered_notify: Boolean(
+              device.mail_delivered_notify ?? true
+            ),
+            mailbox_opened_notify: Boolean(
+              device.mailbox_opened_notify ?? true
+            ),
+            mail_removed_notify: Boolean(device.mail_removed_notify ?? true),
+            email_notifications: Boolean(device.email_notifications ?? true),
+          });
+
           setDeviceSettings((prev) => ({
             ...prev,
-            name: device.name || "",
-            location: device.location || "",
+            check_interval: String(device.check_interval ?? 15),
+            capture_image_on_open: Boolean(
+              device.capture_image_on_open ?? true
+            ),
+            capture_image_on_delivery: Boolean(
+              device.capture_image_on_delivery ?? true
+            ),
           }));
-
-          // Extract settings from the device object directly if available
-          // This avoids an extra API call if the dashboard data already contains these settings
-          if (device) {
-            setNotificationSettings({
-              mail_delivered_notify: Boolean(
-                device.mail_delivered_notify ?? true
-              ),
-              mailbox_opened_notify: Boolean(
-                device.mailbox_opened_notify ?? true
-              ),
-              mail_removed_notify: Boolean(device.mail_removed_notify ?? true),
-              email_notifications: Boolean(device.email_notifications ?? true),
-            });
-
-            setDeviceSettings((prev) => ({
-              ...prev,
-              check_interval: String(device.check_interval ?? 15),
-              capture_image_on_open: Boolean(
-                device.capture_image_on_open ?? true
-              ),
-              capture_image_on_delivery: Boolean(
-                device.capture_image_on_delivery ?? true
-              ),
-            }));
-          } else {
-            // If full settings aren't available in the dashboard response, fetch detailed settings
-            await loadDeviceSettings(device.id, user.id);
-          }
+        } else {
+          // If full settings aren't available in the dashboard response, fetch detailed settings
+          await loadDeviceSettings(device.id, user.id);
         }
-      } catch (err: any) {
-        console.error("Failed to load settings:", err);
-        setError(`Error loading settings: ${err.message}`);
-      } finally {
-        setIsLoading(false);
+      }
+    } catch (err: any) {
+      console.error("Failed to load settings:", err);
+      setError(`Error loading settings: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load devices and settings on component mount
+  useEffect(() => {
+    loadSettings();
+  }, [user]);
+
+  // Add a focus event listener to refresh data when the settings tab becomes visible
+  useEffect(() => {
+    const handleFocus = () => {
+      // If we have no devices, it might be because a device was deleted in another tab
+      if (user?.id && devices.length === 0 && !isLoading) {
+        console.log("Settings tab focused with no devices - refreshing data");
+        window.location.reload();
       }
     };
 
-    loadSettings();
-  }, [user]);
+    // Use both focus and visibility change events for better coverage
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [user?.id, devices.length, isLoading]);
 
   // Function to load device settings (only used if not already available in dashboard data)
   const loadDeviceSettings = async (deviceId: number, clerkId: string) => {

@@ -234,7 +234,6 @@ export default function Dashboard() {
             ? dashboardData.recent_images
             : []
         );
-        setLastUpdateTime(new Date());
       } catch (err: any) {
         console.error("Dashboard data fetch error:", err);
         const errorMessage = err.message || "Unknown error";
@@ -262,6 +261,8 @@ export default function Dashboard() {
           ]);
         }
       } finally {
+        // Always update timestamp, regardless of success or failure
+        setLastUpdateTime(new Date());
         setIsLoading(false);
         setIsRefreshing(false);
       }
@@ -529,25 +530,53 @@ export default function Dashboard() {
   // Show error state
   if (error) {
     return (
-      <Alert variant="destructive" className="max-w-2xl mx-auto">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          <div className="space-y-4">
-            <p>{error}</p>
-            <Button
-              onClick={handleManualRefresh}
-              variant="outline"
-              disabled={isRefreshing}
-              className="w-fit"
-            >
-              <RefreshCw
-                className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              {isRefreshing ? "Refreshing..." : "Try Again"}
-            </Button>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-gray-600 mt-1">Monitor your delivery hub</p>
+            {lastUpdateTime && (
+              <p className="text-sm text-gray-500 mt-2">
+                Last updated: {lastUpdateTime.toLocaleTimeString()}
+              </p>
+            )}
           </div>
-        </AlertDescription>
-      </Alert>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="flex items-center"
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
+          </Button>
+        </div>
+
+        <Alert variant="destructive" className="max-w-2xl">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-4">
+              <p>{error}</p>
+              <Button
+                onClick={handleManualRefresh}
+                variant="outline"
+                disabled={isRefreshing}
+                className="w-fit"
+              >
+                <RefreshCw
+                  className={`mr-2 h-4 w-4 ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`}
+                />
+                {isRefreshing ? "Refreshing..." : "Try Again"}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
     );
   }
 
@@ -758,13 +787,11 @@ export default function Dashboard() {
           icon={Activity}
           label="Today's Events"
           value={todayEvents.length}
-          trend={{ value: 12, isPositive: true }}
         />
         <StatCard
           icon={Mail}
           label="Total Deliveries"
           value={deliveryEvents.length}
-          trend={{ value: 8, isPositive: true }}
         />
         <StatCard
           icon={isDeviceOnline ? Wifi : WifiOff}

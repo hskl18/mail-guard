@@ -106,9 +106,16 @@ export default function Notifications() {
       setIsLoading(true);
       setError("");
 
+      // Clear previous state when reloading
+      setDevices([]);
+      setNotifications([]);
+      setImages([]);
+
       try {
         // Use the Next.js API route for dashboard data
-        const dashboardUrl = `/api/dashboard?clerk_id=${user.id}`;
+        const dashboardUrl = `/api/dashboard?clerk_id=${
+          user.id
+        }&t=${Date.now()}`;
         console.log(`Fetching dashboard data from: ${dashboardUrl}`);
 
         const dashboardRes = await fetch(dashboardUrl, {
@@ -249,6 +256,29 @@ export default function Notifications() {
 
     loadNotifications();
   }, [user]);
+
+  // Add a focus event listener to refresh data when the notifications tab becomes visible
+  useEffect(() => {
+    const handleFocus = () => {
+      // If we have no devices, it might be because a device was deleted in another tab
+      if (user?.id && devices.length === 0 && !isLoading) {
+        console.log(
+          "Notifications tab focused with no devices - refreshing data"
+        );
+        // Re-run the load function by triggering a re-render
+        window.location.reload();
+      }
+    };
+
+    // Use both focus and visibility change events for better coverage
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [user?.id, devices.length, isLoading]);
 
   const filteredNotifications =
     filter === "all"
