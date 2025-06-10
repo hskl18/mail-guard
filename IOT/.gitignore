@@ -3,3 +3,11 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Environment variables (contains secrets)
+.env
+.env.local
+.env.*.local
+
+# But allow example files
+!.env.example

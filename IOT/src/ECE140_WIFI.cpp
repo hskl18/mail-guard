@@ -1,8 +1,6 @@
 #include "ECE140_WIFI.h"
 
-ECE140_WIFI::ECE140_WIFI() {
-    Serial.println("[ECE140_WIFI] Initialized");
-}
+ECE140_WIFI::ECE140_WIFI() { Serial.println("[ECE140_WIFI] Initialized"); }
 
 void ECE140_WIFI::connectToWiFi(String ssid, String password) {
   Serial.println("[WiFi] Connecting to WiFi...");
@@ -14,19 +12,23 @@ void ECE140_WIFI::connectToWiFi(String ssid, String password) {
   Serial.println("\n[WiFi] Connected to WiFi.");
 }
 
-void ECE140_WIFI::connectToWPAEnterprise(String ssid, String username, String password) {
+void ECE140_WIFI::connectToWPAEnterprise(String ssid, String username,
+                                         String password) {
   Serial.println("[WiFi] Connecting to WPA Enterprise...");
 
-  WiFi.disconnect(true); 
-  WiFi.mode(WIFI_STA); 
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_STA);
 
-  esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)username.c_str(), username.length());
-  esp_wifi_sta_wpa2_ent_set_username((uint8_t *)username.c_str(), username.length());
-  esp_wifi_sta_wpa2_ent_set_password((uint8_t *)password.c_str(), password.length());
-  
+  esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)username.c_str(),
+                                     username.length());
+  esp_wifi_sta_wpa2_ent_set_username((uint8_t *)username.c_str(),
+                                     username.length());
+  esp_wifi_sta_wpa2_ent_set_password((uint8_t *)password.c_str(),
+                                     password.length());
+
   esp_wifi_sta_wpa2_ent_enable();
 
-  WiFi.begin(ssid.c_str()); 
+  WiFi.begin(ssid.c_str());
 
   Serial.print("Waiting for connection...");
   while (WiFi.status() != WL_CONNECTED) {

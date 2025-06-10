@@ -21,24 +21,13 @@ const unsigned long weightCheckInterval = 60000; // 60 seconds
 const float weightChangeThreshold = 15.0f;       // 15 grams
 // ===================================
 
-/*
 const char* ucsdUsername = WIFI_USER;
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
-*/
-
-const char *ucsdUsername = "asanisetty";
-const char *ssid = "UCSD-PROTECTED";
-const char *password = "#1Anfield>>>>";
 
 // Device identification
 const char *SERIES_ID = "ESP32_001";
 const char *apiUrl = "https://mail-guard-ten.vercel.app";
-
-// Legacy variables - can be removed if not needed elsewhere
-const char *serverIpAddress = SERVER_IP;
-const char *serverPortChar = SERVER_PORT;
-const int serverPort = atoi(serverPortChar);
 
 const int REED_SW_PIN = 2;
 HardwareSerial CamSerial(2);
