@@ -574,36 +574,141 @@ export async function GET(request: NextRequest) {
 
   if (format === "html") {
     const html = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mail Guard IoT API Documentation</title>
-  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAbwAAAG8B8aLcQwAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAANCSURBVDiNpZNrSFNhGMefczabzjlv005nnbdpF8+8TVPMIi8RJhZFRQQhRWBfiiA=">
   <style>
-    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
-    *, *:before, *:after { box-sizing: inherit; }
-    body { margin:0; background: #fafafa; }
+    html {
+      box-sizing: border-box;
+      overflow: -moz-scrollbars-vertical;
+      overflow-y: scroll;
+    }
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+    body {
+      margin: 0;
+      background: #fafafa;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    #swagger-ui {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .swagger-ui .topbar {
+      display: none;
+    }
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-size: 18px;
+      color: #666;
+    }
+    .error {
+      padding: 20px;
+      margin: 20px;
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 4px;
+      color: #721c24;
+    }
+    .fallback {
+      padding: 20px;
+      margin: 20px;
+      background: #d1ecf1;
+      border: 1px solid #bee5eb;
+      border-radius: 4px;
+      color: #0c5460;
+    }
+    .fallback a {
+      color: #0c5460;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
+  <div id="loading" class="loading">Loading API Documentation...</div>
   <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
-  <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-standalone-preset.js"></script>
+  <div id="fallback" class="fallback" style="display: none;">
+    <h3>📚 Alternative Documentation Access</h3>
+    <p>If the interactive documentation doesn't load, you can:</p>
+    <ul>
+      <li><a href="/api/docs?format=json" target="_blank">📄 View Raw JSON Schema</a></li>
+      <li><a href="https://editor.swagger.io/" target="_blank">🔧 Open Swagger Editor</a> and paste the JSON</li>
+      <li><a href="https://petstore.swagger.io/?url=${encodeURIComponent(
+        window.location.origin + "/api/docs?format=json"
+      )}" target="_blank">🌐 View in Swagger Petstore</a></li>
+    </ul>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui-bundle.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js" crossorigin></script>
+  
   <script>
     window.onload = function() {
-      SwaggerUIBundle({
-        url: '/api/docs?format=json',
-        dom_id: '#swagger-ui',
-        deepLinking: true,
-        presets: [
-          SwaggerUIBundle.presets.apis,
-          SwaggerUIStandalonePreset
-        ],
-        plugins: [
-          SwaggerUIBundle.plugins.DownloadUrl
-        ],
-        layout: "StandaloneLayout"
-      });
+      const loadingEl = document.getElementById('loading');
+      const fallbackEl = document.getElementById('fallback');
+      
+      try {
+        // Show loading initially
+        loadingEl.style.display = 'flex';
+        
+        const ui = SwaggerUIBundle({
+          url: '/api/docs?format=json',
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIStandalonePreset
+          ],
+          plugins: [
+            SwaggerUIBundle.plugins.DownloadUrl
+          ],
+          layout: "StandaloneLayout",
+          tryItOutEnabled: true,
+          filter: true,
+          supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+          onComplete: function() {
+            loadingEl.style.display = 'none';
+            console.log('✅ Mail Guard API Documentation loaded successfully');
+          },
+          onFailure: function(err) {
+            console.error('❌ Failed to load API documentation:', err);
+            loadingEl.style.display = 'none';
+            fallbackEl.style.display = 'block';
+          }
+        });
+        
+        // Fallback timeout
+        setTimeout(function() {
+          if (loadingEl.style.display !== 'none') {
+            console.warn('⏰ Documentation loading timeout, showing fallback options');
+            loadingEl.style.display = 'none';
+            fallbackEl.style.display = 'block';
+          }
+        }, 10000); // 10 second timeout
+        
+      } catch (error) {
+        console.error('❌ Error initializing Swagger UI:', error);
+        loadingEl.style.display = 'none';
+        fallbackEl.style.display = 'block';
+      }
     };
+    
+    // Handle script loading errors
+    window.addEventListener('error', function(e) {
+      if (e.target.tagName === 'SCRIPT') {
+        console.error('❌ Failed to load Swagger UI scripts:', e.target.src);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('fallback').style.display = 'block';
+      }
+    });
   </script>
 </body>
 </html>`;
