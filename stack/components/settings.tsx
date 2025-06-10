@@ -11,6 +11,11 @@ import {
   AlertTriangle,
   UserIcon,
   Settings as SettingsIcon,
+  Camera,
+  Clock,
+  CheckCircle2,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 import {
   Card,
@@ -25,6 +30,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -253,7 +260,6 @@ export default function Settings() {
       ) {
         const devicePayload = {
           clerk_id: user.id,
-          email: currentDevice.email,
           name: deviceSettings.name,
           location: deviceSettings.location,
           is_active: currentDevice.is_active,
@@ -273,10 +279,14 @@ export default function Settings() {
         }
       }
 
-      toast.success("Settings saved successfully");
+      toast.success("Settings saved successfully", {
+        description: "Your preferences have been updated.",
+      });
     } catch (err: any) {
       console.error("Failed to save settings:", err);
-      toast.error(`Error saving settings: ${err.message}`);
+      toast.error("Failed to save settings", {
+        description: err.message || "Please try again later.",
+      });
     } finally {
       setSaving(false);
     }
@@ -284,10 +294,39 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading settings...</p>
+      <div className="space-y-8">
+        {/* Header skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-[200px]" />
+          <Skeleton className="h-4 w-[300px]" />
+        </div>
+
+        {/* Tabs skeleton */}
+        <Skeleton className="h-10 w-full" />
+
+        {/* Content skeleton */}
+        <div className="space-y-6">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-[150px]" />
+                <Skeleton className="h-4 w-[250px]" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Skeleton className="h-4 w-[120px]" />
+                        <Skeleton className="h-3 w-[200px]" />
+                      </div>
+                      <Skeleton className="h-6 w-10" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -295,328 +334,427 @@ export default function Settings() {
 
   if (error) {
     return (
-      <div className="p-6 bg-red-50 rounded-lg text-center">
-        <p className="text-red-700">{error}</p>
-        <Button
-          onClick={() => window.location.reload()}
-          className="mt-4"
-          variant="outline"
-        >
-          Try Again
-        </Button>
-      </div>
+      <Alert variant="destructive" className="max-w-2xl mx-auto">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>
+          <div className="space-y-4">
+            <p>{error}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="w-fit"
+            >
+              Try Again
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
     );
   }
 
   // If no devices, show a message
   if (devices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <p className="mb-4 text-gray-600">No devices connected yet.</p>
-        <Button onClick={() => (window.location.href = "/connect-device")}>
-          Connect Device
-        </Button>
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="text-center max-w-md mx-auto">
+          <div className="mx-auto h-24 w-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6">
+            <SettingsIcon className="h-12 w-12 text-gray-400" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-3">
+            No Device Connected
+          </h3>
+          <p className="text-gray-600 mb-8">
+            Connect your IoT mailbox monitoring device to configure settings.
+          </p>
+          <Button onClick={() => (window.location.href = "/connect-device")}>
+            Connect Device
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <Tabs defaultValue="notifications" className="w-full">
-      <TabsList className="grid w-full grid-cols-3 mb-6">
-        <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        <TabsTrigger value="device">Device</TabsTrigger>
-        <TabsTrigger value="account">Account</TabsTrigger>
-      </TabsList>
+    <div className="space-y-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+        <p className="text-gray-600 mt-1">
+          Manage your device preferences and account settings
+        </p>
+      </div>
 
-      <TabsContent value="notifications">
-        <Card>
-          <CardHeader>
-            <CardTitle>Notification Settings</CardTitle>
-            <CardDescription>
-              Configure how and when you receive notifications
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Event Notifications</h3>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-green-500" />
-                  <Label htmlFor="mail-delivered">Mail delivered</Label>
-                </div>
-                <Switch
-                  id="mail-delivered"
-                  checked={notificationSettings.mail_delivered_notify}
-                  onCheckedChange={() =>
-                    handleNotificationChange("mail_delivered_notify")
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-blue-500" />
-                  <Label htmlFor="mailbox-opened">Mailbox opened</Label>
-                </div>
-                <Switch
-                  id="mailbox-opened"
-                  checked={notificationSettings.mailbox_opened_notify}
-                  onCheckedChange={() =>
-                    handleNotificationChange("mailbox_opened_notify")
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-amber-500" />
-                  <Label htmlFor="mail-removed">Mail removed</Label>
-                </div>
-                <Switch
-                  id="mail-removed"
-                  checked={notificationSettings.mail_removed_notify}
-                  onCheckedChange={() =>
-                    handleNotificationChange("mail_removed_notify")
-                  }
-                />
-              </div>
-            </div>
+      <Tabs defaultValue="notifications" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsTrigger value="device" className="flex items-center gap-2">
+            <Monitor className="h-4 w-4" />
+            Device
+          </TabsTrigger>
+          <TabsTrigger
+            value="notifications"
+            className="flex items-center gap-2"
+          >
+            <Bell className="h-4 w-4" />
+            Notifications
+          </TabsTrigger>
 
-            <Separator />
+          <TabsTrigger value="account" className="flex items-center gap-2">
+            <UserIcon className="h-4 w-4" />
+            Account
+          </TabsTrigger>
+        </TabsList>
 
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Email Notifications</h3>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  <div>
-                    <Label htmlFor="email-notifications">
-                      Enable email notifications
+        <TabsContent value="notifications">
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Settings
+              </CardTitle>
+              <CardDescription>
+                Configure how and when you receive notifications about your
+                mailbox activity
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Event Notifications
+                </h3>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Mail className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor="mail-delivered"
+                          className="text-base font-medium"
+                        >
+                          Mail delivered
+                        </Label>
+                        <p className="text-sm text-gray-600">
+                          Get notified when new mail arrives in your mailbox
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="mail-delivered"
+                      checked={notificationSettings.mail_delivered_notify}
+                      onCheckedChange={() =>
+                        handleNotificationChange("mail_delivered_notify")
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Wifi className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor="mailbox-opened"
+                          className="text-base font-medium"
+                        >
+                          Mailbox opened
+                        </Label>
+                        <p className="text-sm text-gray-600">
+                          Get alerted when someone opens your mailbox
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="mailbox-opened"
+                      checked={notificationSettings.mailbox_opened_notify}
+                      onCheckedChange={() =>
+                        handleNotificationChange("mailbox_opened_notify")
+                      }
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-100 rounded-lg">
+                        <CheckCircle2 className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor="mail-removed"
+                          className="text-base font-medium"
+                        >
+                          Mail removed
+                        </Label>
+                        <p className="text-sm text-gray-600">
+                          Get notified when mail is collected from your mailbox
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="mail-removed"
+                      checked={notificationSettings.mail_removed_notify}
+                      onCheckedChange={() =>
+                        handleNotificationChange("mail_removed_notify")
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Delivery Methods
+                </h3>
+                <Card className="bg-gray-50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-100 rounded-lg">
+                          <Mail className="h-5 w-5 text-gray-600" />
+                        </div>
+                        <div>
+                          <Label
+                            htmlFor="email-notifications"
+                            className="text-base font-medium"
+                          >
+                            Enable email notifications
+                          </Label>
+                          <p className="text-sm text-gray-600">
+                            Receive email alerts for the events you've selected
+                            above
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id="email-notifications"
+                        checked={notificationSettings.email_notifications}
+                        onCheckedChange={() =>
+                          handleNotificationChange("email_notifications")
+                        }
+                      />
+                    </div>
+
+                    {notificationSettings.email_notifications && (
+                      <Alert className="mt-4 border-green-200 bg-green-50">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-700">
+                          Email notifications are enabled. You'll receive emails
+                          at{" "}
+                          <strong>
+                            {user?.primaryEmailAddress?.emailAddress}
+                          </strong>{" "}
+                          for the selected events.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {!notificationSettings.email_notifications && (
+                      <Alert className="mt-4 border-amber-200 bg-amber-50">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-700">
+                          Email notifications are disabled. You won't receive
+                          any email alerts for mailbox events.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button
+                className="ml-auto"
+                onClick={saveSettings}
+                disabled={saving}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="device">
+          <Card className="border-l-4 border-l-green-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Monitor className="h-5 w-5" />
+                Device Settings
+              </CardTitle>
+              <CardDescription>
+                Configure your Smart Mailbox Monitor device preferences
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Device Information
+                </h3>
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="device-name"
+                      className="text-base font-medium"
+                    >
+                      Device Name
                     </Label>
-                    <p className="text-xs text-gray-500">
-                      Receive email alerts for the events you've selected above
-                    </p>
+                    <Input
+                      id="device-name"
+                      value={deviceSettings.name}
+                      onChange={(e) =>
+                        handleDeviceSettingChange("name", e.target.value)
+                      }
+                      placeholder="Enter device name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="location" className="text-base font-medium">
+                      Location
+                    </Label>
+                    <Input
+                      id="location"
+                      value={deviceSettings.location}
+                      onChange={(e) =>
+                        handleDeviceSettingChange("location", e.target.value)
+                      }
+                      placeholder="e.g., Front door, Building A"
+                    />
                   </div>
                 </div>
-                <Switch
-                  id="email-notifications"
-                  checked={notificationSettings.email_notifications}
-                  onCheckedChange={() =>
-                    handleNotificationChange("email_notifications")
-                  }
-                />
               </div>
-              {notificationSettings.email_notifications && (
-                <div className="bg-green-50 p-3 rounded-md">
-                  <p className="text-sm text-green-700">
-                    ✅ Email notifications are enabled. You'll receive emails at{" "}
-                    <strong>{user?.primaryEmailAddress?.emailAddress}</strong>{" "}
-                    for the selected events.
-                  </p>
-                </div>
-              )}
-              {!notificationSettings.email_notifications && (
-                <div className="bg-amber-50 p-3 rounded-md">
-                  <p className="text-sm text-amber-700">
-                    ⚠️ Email notifications are disabled. You won't receive any
-                    email alerts for mailbox events.
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button
-              className="ml-auto"
-              onClick={saveSettings}
-              disabled={saving}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </CardFooter>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="device">
-        <Card>
-          <CardHeader>
-            <CardTitle>Device Settings</CardTitle>
-            <CardDescription>
-              Configure your Smart Mailbox Monitor device
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="device-name">Device Name</Label>
-                <Input
-                  id="device-name"
-                  value={deviceSettings.name}
-                  onChange={(e) =>
-                    handleDeviceSettingChange("name", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={deviceSettings.location}
-                  onChange={(e) =>
-                    handleDeviceSettingChange("location", e.target.value)
-                  }
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="check-interval">Check Interval (minutes)</Label>
-                <Select
-                  value={deviceSettings.check_interval}
-                  onValueChange={(value) =>
-                    handleDeviceSettingChange("check_interval", value)
-                  }
-                >
-                  <SelectTrigger id="check-interval">
-                    <SelectValue placeholder="Select interval" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5 minutes</SelectItem>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">
-                  How often the device checks for mail.
-                </p>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Camera Settings</h3>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="capture-on-open">
-                    Capture image when mailbox is opened
-                  </Label>
-                  <p className="text-xs text-gray-500">
-                    Takes a photo whenever the mailbox is opened
-                  </p>
-                </div>
-                <Switch
-                  id="capture-on-open"
-                  checked={deviceSettings.capture_image_on_open}
-                  onCheckedChange={(checked) =>
-                    handleDeviceSettingChange("capture_image_on_open", checked)
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="capture-on-delivery">
-                    Capture image on mail delivery
-                  </Label>
-                  <p className="text-xs text-gray-500">
-                    Takes a photo when new mail is detected
-                  </p>
-                </div>
-                <Switch
-                  id="capture-on-delivery"
-                  checked={deviceSettings.capture_image_on_delivery}
-                  onCheckedChange={(checked) =>
-                    handleDeviceSettingChange(
-                      "capture_image_on_delivery",
-                      checked
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <Separator />
-          </CardContent>
-          <CardFooter>
-            <Button
-              className="ml-auto"
-              onClick={saveSettings}
-              disabled={saving}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </CardFooter>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="account">
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Settings</CardTitle>
-            <CardDescription>Manage your Mail Guard account</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                {user?.imageUrl ? (
-                  <img
-                    src={user.imageUrl}
-                    alt="Profile"
-                    className="h-12 w-12 rounded-full"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-full bg-gray-200 flex items-center justify-center">
-                    <UserIcon className="h-6 w-6 text-gray-500" />
-                  </div>
-                )}
-                <div>
-                  <p className="font-medium">
-                    {user?.fullName || user?.username}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {user?.primaryEmailAddress?.emailAddress}
-                  </p>
-                </div>
-              </div>
+            </CardContent>
+            <CardFooter>
               <Button
-                onClick={() => openUserProfile()}
-                className="flex items-center"
+                className="ml-auto"
+                onClick={saveSettings}
+                disabled={saving}
               >
-                <SettingsIcon className="h-4 w-4 mr-2" />
-                Manage Account
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? "Saving..." : "Save Changes"}
               </Button>
-            </div>
+            </CardFooter>
+          </Card>
+        </TabsContent>
 
-            <Separator className="my-6" />
-
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">Connected Accounts</h3>
-              <p className="text-sm text-gray-500">
-                Manage your account details, profile information, and security
-                settings through Clerk's secure user management portal.
-              </p>
-              <div className="space-y-2">
-                <p className="text-sm">With Clerk, you can:</p>
-                <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
-                  <li>Update your personal information</li>
-                  <li>Change your password or set up passwordless login</li>
-                  <li>Enable two-factor authentication</li>
-                  <li>Manage connected social accounts</li>
-                  <li>View login history and active sessions</li>
-                </ul>
+        <TabsContent value="account">
+          <Card className="border-l-4 border-l-purple-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserIcon className="h-5 w-5" />
+                Account Settings
+              </CardTitle>
+              <CardDescription>
+                Manage your Mail Guard account and profile
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Profile Information
+                </h3>
+                <Card className="bg-gray-50">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        {user?.imageUrl ? (
+                          <img
+                            src={user.imageUrl}
+                            alt="Profile"
+                            className="h-16 w-16 rounded-full border-2 border-gray-200"
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                            <UserIcon className="h-8 w-8 text-gray-500" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">
+                            {user?.fullName || user?.username}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {user?.primaryEmailAddress?.emailAddress}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Member since{" "}
+                            {new Date(
+                              user?.createdAt || ""
+                            ).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => openUserProfile()}
+                        className="flex items-center"
+                      >
+                        <SettingsIcon className="h-4 w-4 mr-2" />
+                        Manage Account
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <Button
-                onClick={() => openUserProfile()}
-                variant="outline"
-                className="w-full mt-4"
-              >
-                Open Account Settings
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+
+              <Separator />
+
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Account Management
+                </h3>
+                <div className="space-y-4">
+                  <p className="text-gray-600">
+                    Manage your account details, profile information, and
+                    security settings through Clerk's secure user management
+                    portal.
+                  </p>
+
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold text-blue-900 mb-2">
+                        Account Features
+                      </h4>
+                      <ul className="space-y-2 text-sm text-blue-800">
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Update personal information and profile picture
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Change password or set up passwordless login
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Enable two-factor authentication for security
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          Manage connected social accounts
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" />
+                          View login history and active sessions
+                        </li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  <Button
+                    onClick={() => openUserProfile()}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    <SettingsIcon className="h-4 w-4 mr-2" />
+                    Open Account Settings
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

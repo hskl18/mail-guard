@@ -1,16 +1,39 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Toaster } from "sonner";
 import Dashboard from "@/components/dashboard";
+import Committee from "@/components/committee";
 import Notifications from "@/components/notifications";
 import Settings from "@/components/settings";
-import { Loader2, Mail, Shield, BarChart3, BookOpen } from "lucide-react";
+import {
+  Loader2,
+  Mail,
+  Shield,
+  BarChart3,
+  BookOpen,
+  Users,
+} from "lucide-react";
 import UserNav from "@/components/user-nav";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function AuthenticatedApp() {
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (
+      tab &&
+      ["dashboard", "committee", "notifications", "settings"].includes(tab)
+    ) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
@@ -45,9 +68,9 @@ export default function AuthenticatedApp() {
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Navigation Tabs */}
-        <Tabs defaultValue="dashboard" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="mb-6 sm:mb-8">
-            <TabsList className="grid w-full grid-cols-3 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+            <TabsList className="grid w-full grid-cols-4 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
               <TabsTrigger
                 value="dashboard"
                 className="flex items-center space-x-2 text-sm sm:text-base data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -64,6 +87,15 @@ export default function AuthenticatedApp() {
                 <span className="hidden sm:inline">Notifications</span>
                 <span className="sm:hidden">Alerts</span>
               </TabsTrigger>
+              <TabsTrigger
+                value="committee"
+                className="flex items-center space-x-2 text-sm sm:text-base data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              >
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Committee</span>
+                <span className="sm:hidden">Comm</span>
+              </TabsTrigger>
+
               <TabsTrigger
                 value="settings"
                 className="flex items-center space-x-2 text-sm sm:text-base data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -82,6 +114,12 @@ export default function AuthenticatedApp() {
               </Suspense>
             </TabsContent>
 
+            <TabsContent value="committee" className="m-0 p-4 sm:p-6">
+              <Suspense fallback={<LoadingState />}>
+                <Committee />
+              </Suspense>
+            </TabsContent>
+
             <TabsContent value="notifications" className="m-0 p-4 sm:p-6">
               <Suspense fallback={<LoadingState />}>
                 <Notifications />
@@ -96,6 +134,20 @@ export default function AuthenticatedApp() {
           </div>
         </Tabs>
       </main>
+
+      {/* Toast Notifications */}
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        toastOptions={{
+          style: {
+            background: "white",
+            border: "1px solid #e5e7eb",
+            color: "#374151",
+          },
+        }}
+      />
     </div>
   );
 }

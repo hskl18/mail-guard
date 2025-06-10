@@ -255,6 +255,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create community_reports table for community safety reports
+    try {
+      await executeQuery(`
+        CREATE TABLE IF NOT EXISTS community_reports (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          clerk_id VARCHAR(255) NOT NULL,
+          zip_code VARCHAR(10) NOT NULL,
+          description TEXT,
+          image_url VARCHAR(500),
+          event_id INT,
+          device_id INT,
+          status ENUM('pending', 'reviewed', 'resolved') DEFAULT 'pending',
+          submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          reviewed_at DATETIME NULL,
+          resolved_at DATETIME NULL,
+          reviewer_notes TEXT,
+          INDEX idx_clerk_id (clerk_id),
+          INDEX idx_zip_code (zip_code),
+          INDEX idx_status (status),
+          INDEX idx_submitted_at (submitted_at),
+          INDEX idx_event_id (event_id),
+          INDEX idx_device_id (device_id),
+          FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL,
+          FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL
+        )
+      `);
+      results.push("✅ Community reports table created/verified");
+    } catch (error) {
+      errors.push(
+        `❌ Community reports table: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
     // Insert sample data if tables are empty
     try {
       const serialCount = await executeQuery<any[]>(

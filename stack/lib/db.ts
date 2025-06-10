@@ -60,7 +60,7 @@ async function getPool(): Promise<Pool> {
       );
     }
 
-    // Database configuration (removed invalid options)
+    // Database configuration with valid connection pool options
     const dbConfig = {
       host: process.env.MYSQL_HOST,
       port: parseInt(process.env.MYSQL_PORT || "3306"),
@@ -68,8 +68,9 @@ async function getPool(): Promise<Pool> {
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DATABASE,
       ssl: sslConfig,
-      // Valid connection options only
-      connectionLimit: 5,
+      // Valid connection pool options only
+      connectionLimit: 10,
+      queueLimit: 0,
       multipleStatements: false,
       timezone: "Z",
     };
@@ -120,13 +121,28 @@ export async function executeQuery<T>(
   query: string,
   params: any[] = []
 ): Promise<T> {
+  let connection = null;
   try {
     const dbPool = await getPool();
-    const [rows] = await dbPool.execute(query, params);
+    connection = await dbPool.getConnection();
+    const [rows] = await connection.execute(query, params);
     return rows as T;
   } catch (error) {
     console.error("Database error:", error);
     throw new Error("Database query failed");
+  } finally {
+    if (connection) {
+      connection.release(); // Always release the connection back to the pool
+    }
+  }
+}
+
+// Function to close all database connections (useful for cleanup)
+export async function closePool(): Promise<void> {
+  if (pool) {
+    await pool.end();
+    pool = null;
+    console.log("Database connection pool closed");
   }
 }
 
