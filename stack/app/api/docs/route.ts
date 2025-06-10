@@ -641,9 +641,7 @@ export async function GET(request: NextRequest) {
     <ul>
       <li><a href="/api/docs?format=json" target="_blank">📄 View Raw JSON Schema</a></li>
       <li><a href="https://editor.swagger.io/" target="_blank">🔧 Open Swagger Editor</a> and paste the JSON</li>
-      <li><a href="https://petstore.swagger.io/?url=${encodeURIComponent(
-        window.location.origin + "/api/docs?format=json"
-      )}" target="_blank">🌐 View in Swagger Petstore</a></li>
+      <li><a href="#" onclick="openSwaggerPetstore()" target="_blank">🌐 View in Swagger Petstore</a></li>
     </ul>
   </div>
   
@@ -651,6 +649,11 @@ export async function GET(request: NextRequest) {
   <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js" crossorigin></script>
   
   <script>
+    function openSwaggerPetstore() {
+      const url = 'https://petstore.swagger.io/?url=' + encodeURIComponent(window.location.origin + '/api/docs?format=json');
+      window.open(url, '_blank');
+    }
+    
     window.onload = function() {
       const loadingEl = document.getElementById('loading');
       const fallbackEl = document.getElementById('fallback');
