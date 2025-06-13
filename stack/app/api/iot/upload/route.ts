@@ -1,18 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
 import { uploadToS3 } from "@/lib/s3";
+import {
+  authenticateIoTDevice,
+  createSecurityResponse,
+  logSecurityEvent,
+} from "@/lib/api-security";
 
-// POST /api/iot/upload - Upload image from IoT device
+// POST /api/iot/upload - Upload image from IoT device (SECURED)
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Authenticate IoT device first
+    const authResult = await authenticateIoTDevice(request);
+
+    if (!authResult.success) {
+      logSecurityEvent(
+        "IOT_UPLOAD_AUTH_FAILED",
+        {
+          error: authResult.error,
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        authResult.error || "Authentication failed",
+        authResult.statusCode || 401
+      );
+    }
+
     // Check content type first
     const contentType = request.headers.get("content-type") || "";
 
     if (!contentType.includes("multipart/form-data")) {
-      return NextResponse.json(
-        { error: "Image file is required" },
-        { status: 400 }
+      logSecurityEvent(
+        "IOT_UPLOAD_INVALID_CONTENT_TYPE",
+        {
+          contentType,
+          deviceSerial: authResult.deviceSerial,
+        },
+        request
       );
+
+      return createSecurityResponse("Image file is required", 400);
     }
 
     const formData = await request.formData();
@@ -21,61 +51,85 @@ export async function POST(request: NextRequest) {
     const eventType = (formData.get("event_type") as string) || "delivery";
     const timestamp = formData.get("timestamp") as string;
 
-    // Validate that image uploads are only for delivery events
-    if (eventType !== "delivery" && eventType !== "mail_delivered") {
-      return NextResponse.json(
-        {
-          error: "Image uploads are only supported for delivery events",
-          hint: "Use event_type='delivery' for mail delivery photos",
-        },
-        { status: 400 }
-      );
-    }
-
+    // SECURITY: Validate inputs
     if (!file) {
-      return NextResponse.json(
-        { error: "Image file is required" },
-        { status: 400 }
-      );
+      return createSecurityResponse("Image file is required", 400);
     }
 
     if (!serialNumber) {
-      return NextResponse.json(
-        { error: "Serial number is required" },
-        { status: 400 }
+      return createSecurityResponse("Serial number is required", 400);
+    }
+
+    // SECURITY: Verify the authenticated device matches the serial number in payload
+    if (authResult.deviceSerial && authResult.deviceSerial !== serialNumber) {
+      logSecurityEvent(
+        "IOT_UPLOAD_SERIAL_MISMATCH",
+        {
+          authenticatedSerial: authResult.deviceSerial,
+          payloadSerial: serialNumber,
+        },
+        request
+      );
+
+      return createSecurityResponse("Device serial number mismatch", 403);
+    }
+
+    // Validate that image uploads are only for delivery events
+    if (eventType !== "delivery" && eventType !== "mail_delivered") {
+      return createSecurityResponse(
+        "Image uploads are only supported for delivery events. Use event_type='delivery' for mail delivery photos",
+        400
       );
     }
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      return NextResponse.json(
-        { error: "File must be an image" },
-        { status: 400 }
+      logSecurityEvent(
+        "IOT_UPLOAD_INVALID_FILE_TYPE",
+        {
+          fileType: file.type,
+          fileName: file.name,
+          deviceSerial: authResult.deviceSerial,
+        },
+        request
       );
+
+      return createSecurityResponse("File must be an image", 400);
     }
 
     // Check file size (limit to 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "File size must be less than 10MB" },
-        { status: 400 }
+      logSecurityEvent(
+        "IOT_UPLOAD_FILE_TOO_LARGE",
+        {
+          fileSize: file.size,
+          deviceSerial: authResult.deviceSerial,
+        },
+        request
       );
+
+      return createSecurityResponse("File size must be less than 10MB", 400);
     }
 
-    // Check if device serial is valid
+    // Check if device serial is valid (additional validation beyond API key)
     const deviceSerial = await executeQuery<any[]>(
       "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = 1",
       [serialNumber]
     );
 
     if (deviceSerial.length === 0) {
-      return NextResponse.json(
+      logSecurityEvent(
+        "IOT_UPLOAD_INVALID_SERIAL",
         {
-          error: "Invalid device serial number",
           serial_number: serialNumber,
-          action: "Device not recognized",
+          deviceSerial: authResult.deviceSerial,
         },
-        { status: 404 }
+        request
+      );
+
+      return createSecurityResponse(
+        `Invalid device serial number: ${serialNumber}. Device not recognized`,
+        404
       );
     }
 
@@ -210,6 +264,19 @@ export async function POST(request: NextRequest) {
           console.error("Email notification error:", emailError);
         }
 
+        // Log successful upload
+        logSecurityEvent(
+          "IOT_IMAGE_UPLOADED",
+          {
+            serial_number: serialNumber,
+            device_id: deviceId,
+            event_type: eventType,
+            file_size: file.size,
+            s3_url: s3Url,
+          },
+          request
+        );
+
         return NextResponse.json(
           {
             message: "Image uploaded successfully",
@@ -231,6 +298,18 @@ export async function POST(request: NextRequest) {
           [serialNumber, s3Url, eventType, file.size]
         );
 
+        // Log unclaimed device upload
+        logSecurityEvent(
+          "IOT_UNCLAIMED_IMAGE_UPLOADED",
+          {
+            serial_number: serialNumber,
+            event_type: eventType,
+            file_size: file.size,
+            is_claimed: serialInfo.is_claimed,
+          },
+          request
+        );
+
         return NextResponse.json(
           {
             message:
@@ -247,6 +326,15 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (s3Error) {
+      logSecurityEvent(
+        "IOT_UPLOAD_S3_ERROR",
+        {
+          error: s3Error instanceof Error ? s3Error.message : "S3 error",
+          deviceSerial: authResult.deviceSerial,
+        },
+        request
+      );
+
       console.error("S3 upload error:", s3Error);
       return NextResponse.json(
         {
@@ -257,6 +345,15 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
+    logSecurityEvent(
+      "IOT_UPLOAD_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      request
+    );
+
     console.error("IoT upload error:", error);
     return NextResponse.json(
       {
@@ -268,18 +365,51 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/iot/upload?serial_number=XXX - Get recent images for IoT device
+// GET /api/iot/upload?serial_number=XXX - Get recent images for IoT device (SECURED)
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY: Authenticate IoT device first
+    const authResult = await authenticateIoTDevice(request);
+
+    if (!authResult.success) {
+      logSecurityEvent(
+        "IOT_UPLOAD_GET_AUTH_FAILED",
+        {
+          error: authResult.error,
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        authResult.error || "Authentication failed",
+        authResult.statusCode || 401
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const serialNumber = searchParams.get("serial_number");
     const limit = parseInt(searchParams.get("limit") || "20");
     const eventType = searchParams.get("event_type");
 
     if (!serialNumber) {
-      return NextResponse.json(
-        { error: "Serial number parameter is required" },
-        { status: 400 }
+      return createSecurityResponse("Serial number parameter is required", 400);
+    }
+
+    // SECURITY: Verify the authenticated device matches the requested serial number
+    if (authResult.deviceSerial && authResult.deviceSerial !== serialNumber) {
+      logSecurityEvent(
+        "IOT_UPLOAD_GET_SERIAL_MISMATCH",
+        {
+          authenticatedSerial: authResult.deviceSerial,
+          requestedSerial: serialNumber,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Cannot access data for different device",
+        403
       );
     }
 
@@ -290,7 +420,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (deviceSerial.length === 0) {
-      return NextResponse.json({ error: "Device not found" }, { status: 404 });
+      return createSecurityResponse("Device not found", 404);
     }
 
     // Simplified - get IoT-specific images only
@@ -307,6 +437,17 @@ export async function GET(request: NextRequest) {
 
     const iotImages = await executeQuery<any[]>(iotQuery, [serialNumber]);
 
+    logSecurityEvent(
+      "IOT_IMAGES_RETRIEVED",
+      {
+        serial_number: serialNumber,
+        image_count: iotImages.length,
+        event_type: eventType,
+        limit,
+      },
+      request
+    );
+
     return NextResponse.json({
       serial_number: serialNumber,
       is_claimed: deviceSerial[0].is_claimed,
@@ -319,6 +460,14 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    logSecurityEvent(
+      "IOT_UPLOAD_GET_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      request
+    );
+
     console.error("IoT get images error:", error);
     return NextResponse.json(
       {

@@ -1,17 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
+import {
+  authenticateIoTDevice,
+  createSecurityResponse,
+  logSecurityEvent,
+  checkRateLimit,
+  hashApiKey,
+} from "@/lib/api-security";
 
-// POST /api/iot/activate - IoT device checking if serial number is valid
+// POST /api/iot/activate - IoT device checking if serial number is valid (SECURED)
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Authenticate IoT device first
+    const authResult = await authenticateIoTDevice(request);
+
+    if (!authResult.success) {
+      logSecurityEvent(
+        "IOT_ACTIVATE_AUTH_FAILED",
+        {
+          error: authResult.error,
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        authResult.error || "Authentication failed",
+        authResult.statusCode || 401
+      );
+    }
+
     const body = await request.json();
     const { serial_number, firmware_version, device_type } = body;
 
     if (!serial_number) {
-      return NextResponse.json(
-        { error: "Serial number is required" },
-        { status: 400 }
+      return createSecurityResponse("Serial number is required", 400);
+    }
+
+    // SECURITY: Verify the authenticated device matches the serial number in payload
+    if (authResult.deviceSerial && authResult.deviceSerial !== serial_number) {
+      logSecurityEvent(
+        "IOT_ACTIVATE_SERIAL_MISMATCH",
+        {
+          authenticatedSerial: authResult.deviceSerial,
+          payloadSerial: serial_number,
+        },
+        request
       );
+
+      return createSecurityResponse("Device serial number mismatch", 403);
     }
 
     // Check if serial number exists in valid serials table, if not create it automatically
@@ -39,6 +76,16 @@ export async function POST(request: NextRequest) {
         [serial_number]
       );
       deviceInfo = validSerial[0];
+
+      logSecurityEvent(
+        "IOT_DEVICE_AUTO_REGISTERED",
+        {
+          serial_number,
+          device_type: device_type || "mailbox_monitor",
+          firmware_version: firmware_version || "1.0.0",
+        },
+        request
+      );
     } else {
       deviceInfo = validSerial[0];
 
@@ -49,6 +96,14 @@ export async function POST(request: NextRequest) {
           [serial_number]
         );
         deviceInfo.is_valid = 1;
+
+        logSecurityEvent(
+          "IOT_DEVICE_REACTIVATED",
+          {
+            serial_number,
+          },
+          request
+        );
       }
     }
 
@@ -87,6 +142,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    logSecurityEvent(
+      "IOT_DEVICE_ACTIVATED",
+      {
+        serial_number,
+        is_claimed: deviceInfo.is_claimed,
+        device_model: deviceInfo.device_model,
+        firmware_version: firmware_version || "1.0.0",
+        device_type: device_type || "mailbox_monitor",
+      },
+      request
+    );
+
     return NextResponse.json({
       message: "Device serial number validated",
       serial_number: serial_number,
@@ -97,6 +164,15 @@ export async function POST(request: NextRequest) {
       last_seen: new Date().toISOString(),
     });
   } catch (error) {
+    logSecurityEvent(
+      "IOT_ACTIVATE_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      request
+    );
+
     console.error("IoT validation error:", error);
     return NextResponse.json(
       {
@@ -108,16 +184,49 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/iot/activate?serial_number=XXX - Check device status
+// GET /api/iot/activate?serial_number=XXX - Check device status (SECURED)
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY: Authenticate IoT device first
+    const authResult = await authenticateIoTDevice(request);
+
+    if (!authResult.success) {
+      logSecurityEvent(
+        "IOT_ACTIVATE_GET_AUTH_FAILED",
+        {
+          error: authResult.error,
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        authResult.error || "Authentication failed",
+        authResult.statusCode || 401
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const serialNumber = searchParams.get("serial_number");
 
     if (!serialNumber) {
-      return NextResponse.json(
-        { error: "Serial number parameter is required" },
-        { status: 400 }
+      return createSecurityResponse("Serial number parameter is required", 400);
+    }
+
+    // SECURITY: Verify the authenticated device matches the requested serial number
+    if (authResult.deviceSerial && authResult.deviceSerial !== serialNumber) {
+      logSecurityEvent(
+        "IOT_ACTIVATE_GET_SERIAL_MISMATCH",
+        {
+          authenticatedSerial: authResult.deviceSerial,
+          requestedSerial: serialNumber,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Cannot access data for different device",
+        403
       );
     }
 
@@ -144,6 +253,14 @@ export async function GET(request: NextRequest) {
         "SELECT * FROM device_serials WHERE serial_number = ?",
         [serialNumber]
       );
+
+      logSecurityEvent(
+        "IOT_DEVICE_AUTO_REGISTERED_GET",
+        {
+          serial_number: serialNumber,
+        },
+        request
+      );
     }
 
     // Get current device status
@@ -163,6 +280,17 @@ export async function GET(request: NextRequest) {
 
     const isDashboardLinked = dashboardDevice.length > 0;
     const dashboardDeviceId = isDashboardLinked ? dashboardDevice[0].id : null;
+
+    logSecurityEvent(
+      "IOT_DEVICE_STATUS_CHECKED",
+      {
+        serial_number: serialNumber,
+        is_claimed: serialInfo.is_claimed || isDashboardLinked,
+        dashboard_linked: isDashboardLinked,
+        is_online: statusInfo?.is_online || false,
+      },
+      request
+    );
 
     return NextResponse.json({
       serial_number: serialNumber,
@@ -188,6 +316,14 @@ export async function GET(request: NextRequest) {
         : null,
     });
   } catch (error) {
+    logSecurityEvent(
+      "IOT_ACTIVATE_GET_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      request
+    );
+
     console.error("IoT status check error:", error);
     return NextResponse.json(
       {

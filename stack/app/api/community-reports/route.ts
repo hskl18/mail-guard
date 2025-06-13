@@ -1,40 +1,114 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
 import { auth } from "@clerk/nextjs/server";
+import {
+  createSecurityResponse,
+  logSecurityEvent,
+  checkRateLimit,
+} from "@/lib/api-security";
 
-// POST /api/community-reports - Submit a community safety report
+// POST /api/community-reports - Submit a community safety report (SECURED)
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UNAUTHORIZED",
+        {
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse("Authentication required", 401);
+    }
+
+    // SECURITY: Rate limiting - lower limit for reports to prevent spam
+    if (!checkRateLimit(`user_${userId}_reports`, 50)) {
+      // 50 reports per hour
+      logSecurityEvent(
+        "COMMUNITY_REPORT_RATE_LIMITED",
+        {
+          userId,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Rate limit exceeded. Please try again later",
+        429
       );
     }
 
     const body = await request.json();
     const { zip_code, description, image_url } = body;
 
-    // Validate required fields
+    // SECURITY: Validate required fields
     if (!zip_code) {
-      return NextResponse.json(
-        { error: "Zip code is required" },
-        { status: 400 }
+      logSecurityEvent(
+        "COMMUNITY_REPORT_INVALID_DATA",
+        {
+          userId,
+          hasZipCode: !!zip_code,
+        },
+        request
+      );
+
+      return createSecurityResponse("Zip code is required", 400);
+    }
+
+    // SECURITY: Validate zip code format (US zip code: 5 digits or 5+4 format)
+    const zipRegex = /^\d{5}(-\d{4})?$/;
+    if (!zipRegex.test(zip_code)) {
+      logSecurityEvent(
+        "COMMUNITY_REPORT_INVALID_ZIP",
+        {
+          userId,
+          zipCode: zip_code,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Invalid zip code format. Please use 12345 or 12345-6789 format.",
+        400
       );
     }
 
-    // Validate zip code format (US zip code: 5 digits or 5+4 format)
-    const zipRegex = /^\d{5}(-\d{4})?$/;
-    if (!zipRegex.test(zip_code)) {
-      return NextResponse.json(
+    // SECURITY: Validate description length if provided
+    if (description && description.length > 2000) {
+      logSecurityEvent(
+        "COMMUNITY_REPORT_DESCRIPTION_TOO_LONG",
         {
-          error:
-            "Invalid zip code format. Please use 12345 or 12345-6789 format.",
+          userId,
+          descriptionLength: description.length,
         },
-        { status: 400 }
+        request
       );
+
+      return createSecurityResponse(
+        "Description cannot exceed 2000 characters",
+        400
+      );
+    }
+
+    // SECURITY: Validate image URL format if provided
+    if (image_url && typeof image_url === "string") {
+      try {
+        new URL(image_url);
+      } catch {
+        logSecurityEvent(
+          "COMMUNITY_REPORT_INVALID_IMAGE_URL",
+          {
+            userId,
+            imageUrl: image_url,
+          },
+          request
+        );
+
+        return createSecurityResponse("Invalid image URL format", 400);
+      }
     }
 
     // Insert the community report
@@ -64,6 +138,18 @@ export async function POST(request: NextRequest) {
       [reportId]
     );
 
+    logSecurityEvent(
+      "COMMUNITY_REPORT_CREATED",
+      {
+        userId,
+        reportId,
+        zipCode: zip_code,
+        hasDescription: !!description,
+        hasImage: !!image_url,
+      },
+      request
+    );
+
     return NextResponse.json(
       {
         message: "Community report submitted successfully",
@@ -73,6 +159,15 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    logSecurityEvent(
+      "COMMUNITY_REPORT_CREATE_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      request
+    );
+
     console.error("Community report submission error:", error);
     return NextResponse.json(
       {
@@ -84,15 +179,37 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/community-reports - Get community reports for the user's area
+// GET /api/community-reports - Get community reports for the user's area (SECURED)
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+      logSecurityEvent(
+        "COMMUNITY_REPORT_GET_UNAUTHORIZED",
+        {
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse("Authentication required", 401);
+    }
+
+    // SECURITY: Rate limiting
+    if (!checkRateLimit(`user_${userId}`, 1000)) {
+      // 1000 requests per hour for users
+      logSecurityEvent(
+        "COMMUNITY_REPORT_GET_RATE_LIMITED",
+        {
+          userId,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Rate limit exceeded. Please try again later",
+        429
       );
     }
 
@@ -103,6 +220,37 @@ export async function GET(request: NextRequest) {
       1,
       Math.min(100, parseInt(searchParams.get("limit") || "20"))
     );
+
+    // SECURITY: Validate status parameter if provided
+    if (status && !["pending", "reviewed", "resolved"].includes(status)) {
+      logSecurityEvent(
+        "COMMUNITY_REPORT_INVALID_STATUS_FILTER",
+        {
+          userId,
+          invalidStatus: status,
+        },
+        request
+      );
+
+      return createSecurityResponse("Invalid status filter", 400);
+    }
+
+    // SECURITY: Validate zip code parameter if provided
+    if (zipCode) {
+      const zipRegex = /^\d{5}(-\d{4})?$/;
+      if (!zipRegex.test(zipCode)) {
+        logSecurityEvent(
+          "COMMUNITY_REPORT_INVALID_ZIP_FILTER",
+          {
+            userId,
+            invalidZip: zipCode,
+          },
+          request
+        );
+
+        return createSecurityResponse("Invalid zip code format", 400);
+      }
+    }
 
     let query = `
       SELECT 
@@ -157,6 +305,16 @@ export async function GET(request: NextRequest) {
     const statsParams = zipCode ? [zipCode] : [];
     const stats = await executeQuery<any[]>(statsQuery, statsParams);
 
+    logSecurityEvent(
+      "COMMUNITY_REPORTS_RETRIEVED",
+      {
+        userId,
+        reportCount: reports.length,
+        filters: { zipCode, status, limit },
+      },
+      request
+    );
+
     return NextResponse.json({
       reports: reports.map((report) => ({
         ...report,
@@ -170,6 +328,14 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    logSecurityEvent(
+      "COMMUNITY_REPORT_GET_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      request
+    );
+
     console.error("Community reports fetch error:", error);
     return NextResponse.json(
       {
@@ -181,36 +347,91 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH /api/community-reports - Update report status (for committee members)
+// PATCH /api/community-reports - Update report status (for committee members) (SECURED)
 export async function PATCH(request: NextRequest) {
   try {
     const { userId } = await auth();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UPDATE_UNAUTHORIZED",
+        {
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse("Authentication required", 401);
+    }
+
+    // SECURITY: Rate limiting
+    if (!checkRateLimit(`user_${userId}`, 1000)) {
+      // 1000 requests per hour for users
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UPDATE_RATE_LIMITED",
+        {
+          userId,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Rate limit exceeded. Please try again later",
+        429
       );
     }
 
     const body = await request.json();
     const { report_id, status, reviewer_notes } = body;
 
-    // Validate required fields
+    // SECURITY: Validate required fields
     if (!report_id || !status) {
-      return NextResponse.json(
-        { error: "Report ID and status are required" },
-        { status: 400 }
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UPDATE_INVALID_DATA",
+        {
+          userId,
+          hasReportId: !!report_id,
+          hasStatus: !!status,
+        },
+        request
+      );
+
+      return createSecurityResponse("Report ID and status are required", 400);
+    }
+
+    // SECURITY: Validate status value
+    if (!["pending", "reviewed", "resolved"].includes(status)) {
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UPDATE_INVALID_STATUS",
+        {
+          userId,
+          reportId: report_id,
+          invalidStatus: status,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Invalid status. Must be 'pending', 'reviewed', or 'resolved'",
+        400
       );
     }
 
-    // Validate status value
-    if (!["pending", "reviewed", "resolved"].includes(status)) {
-      return NextResponse.json(
+    // SECURITY: Validate reviewer notes length if provided
+    if (reviewer_notes && reviewer_notes.length > 1000) {
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UPDATE_NOTES_TOO_LONG",
         {
-          error: "Invalid status. Must be 'pending', 'reviewed', or 'resolved'",
+          userId,
+          reportId: report_id,
+          notesLength: reviewer_notes.length,
         },
-        { status: 400 }
+        request
+      );
+
+      return createSecurityResponse(
+        "Reviewer notes cannot exceed 1000 characters",
+        400
       );
     }
 
@@ -262,14 +483,43 @@ export async function PATCH(request: NextRequest) {
     );
 
     if (updatedReport.length === 0) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UPDATE_NOT_FOUND",
+        {
+          userId,
+          reportId: report_id,
+        },
+        request
+      );
+
+      return createSecurityResponse("Report not found", 404);
     }
+
+    logSecurityEvent(
+      "COMMUNITY_REPORT_UPDATED",
+      {
+        userId,
+        reportId: report_id,
+        newStatus: status,
+        hasReviewerNotes: !!reviewer_notes,
+      },
+      request
+    );
 
     return NextResponse.json({
       message: "Report status updated successfully",
       report: updatedReport[0],
     });
   } catch (error) {
+    logSecurityEvent(
+      "COMMUNITY_REPORT_UPDATE_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      request
+    );
+
     console.error("Community report update error:", error);
     return NextResponse.json(
       {

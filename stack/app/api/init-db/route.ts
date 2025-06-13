@@ -1,12 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
+import {
+  authenticateAdmin,
+  createSecurityResponse,
+  logSecurityEvent,
+} from "@/lib/api-security";
 
-// POST /api/init-db - Initialize the entire database schema
+// POST /api/init-db - Initialize the entire database schema (ADMIN ONLY)
 export async function POST(request: NextRequest) {
+  // Require admin authentication for database initialization
+  const authResult = await authenticateAdmin(request);
+
+  if (!authResult.success) {
+    logSecurityEvent(
+      "UNAUTHORIZED_DB_INIT_ATTEMPT",
+      {
+        error: authResult.error,
+      },
+      request
+    );
+
+    return createSecurityResponse(
+      authResult.error || "Unauthorized",
+      authResult.statusCode || 401
+    );
+  }
+
+  logSecurityEvent(
+    "DB_INIT_STARTED",
+    {
+      adminId: authResult.adminId,
+    },
+    request
+  );
+
   const results: string[] = [];
   const errors: string[] = [];
 
   try {
+    // Create api_keys table for API key management
+    try {
+      await executeQuery(`
+        CREATE TABLE IF NOT EXISTS api_keys (
+          id VARCHAR(255) PRIMARY KEY,
+          key_hash VARCHAR(64) NOT NULL UNIQUE,
+          type ENUM('iot_device', 'user', 'admin', 'internal') NOT NULL,
+          device_serial VARCHAR(255),
+          permissions JSON,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          last_used DATETIME,
+          is_active TINYINT(1) DEFAULT 1,
+          created_by VARCHAR(255),
+          description TEXT,
+          INDEX idx_key_hash (key_hash),
+          INDEX idx_type (type),
+          INDEX idx_device_serial (device_serial),
+          INDEX idx_is_active (is_active),
+          INDEX idx_created_at (created_at),
+          FOREIGN KEY (device_serial) REFERENCES device_serials(serial_number) ON DELETE SET NULL
+        )
+      `);
+      results.push("✅ API keys table created/verified");
+    } catch (error) {
+      errors.push(
+        `❌ API keys table: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
     // Create device_serials table for valid serial numbers
     try {
       await executeQuery(`
@@ -290,6 +352,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create security_events table for audit logging
+    try {
+      await executeQuery(`
+        CREATE TABLE IF NOT EXISTS security_events (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          event_type VARCHAR(100) NOT NULL,
+          source_ip VARCHAR(45),
+          user_agent TEXT,
+          api_key_id VARCHAR(255),
+          details JSON,
+          severity ENUM('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') DEFAULT 'MEDIUM',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_event_type (event_type),
+          INDEX idx_source_ip (source_ip),
+          INDEX idx_api_key_id (api_key_id),
+          INDEX idx_severity (severity),
+          INDEX idx_created_at (created_at)
+        )
+      `);
+      results.push("✅ Security events table created/verified");
+    } catch (error) {
+      errors.push(
+        `❌ Security events table: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
     // Insert sample data if tables are empty
     try {
       const serialCount = await executeQuery<any[]>(
@@ -331,6 +421,37 @@ export async function POST(request: NextRequest) {
       } else {
         results.push("ℹ️ Device data already exists, skipping sample data");
       }
+
+      // Insert a sample admin API key if none exists
+      const apiKeyCount = await executeQuery<any[]>(
+        "SELECT COUNT(*) as count FROM api_keys WHERE type = 'admin'"
+      );
+      if (apiKeyCount[0].count === 0) {
+        const { generateApiKey, hashApiKey, ApiKeyType } = await import(
+          "@/lib/api-security"
+        );
+        const adminApiKey = generateApiKey(ApiKeyType.ADMIN);
+        const hashedKey = hashApiKey(adminApiKey);
+
+        await executeQuery(
+          `
+          INSERT INTO api_keys (id, key_hash, type, permissions, created_by, description) VALUES 
+          (?, ?, 'admin', ?, ?, 'Initial admin API key')
+        `,
+          [
+            "admin_" + Date.now(),
+            hashedKey,
+            JSON.stringify(["*"]),
+            authResult.adminId || "system",
+          ]
+        );
+
+        results.push(
+          `✅ Admin API key created: ${adminApiKey.substring(0, 20)}...`
+        );
+      } else {
+        results.push("ℹ️ Admin API keys already exist, skipping creation");
+      }
     } catch (error) {
       errors.push(
         `❌ Sample data: ${
@@ -347,12 +468,31 @@ export async function POST(request: NextRequest) {
       results,
       errors,
       timestamp: new Date().toISOString(),
+      initialized_by: authResult.adminId,
     };
+
+    logSecurityEvent(
+      "DB_INIT_COMPLETED",
+      {
+        summary,
+        adminId: authResult.adminId,
+      },
+      request
+    );
 
     return NextResponse.json(summary, {
       status: errors.length === 0 ? 200 : 207, // 207 Multi-Status for partial success
     });
   } catch (error) {
+    logSecurityEvent(
+      "DB_INIT_FAILED",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        adminId: authResult.adminId,
+      },
+      request
+    );
+
     return NextResponse.json(
       {
         success: false,

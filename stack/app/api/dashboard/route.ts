@@ -1,20 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
 import { DashboardData } from "@/lib/types";
+import { auth } from "@clerk/nextjs/server";
+import {
+  createSecurityResponse,
+  logSecurityEvent,
+  checkRateLimit,
+} from "@/lib/api-security";
 
-// GET /api/dashboard - Get dashboard data for a user
+// GET /api/dashboard - Get dashboard data for a user (SECURED)
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const clerkId = searchParams.get("clerk_id");
-
-  if (!clerkId) {
-    return NextResponse.json(
-      { error: "clerk_id parameter is required" },
-      { status: 400 }
-    );
-  }
-
   try {
+    // SECURITY: Require user authentication
+    const { userId } = await auth();
+
+    if (!userId) {
+      logSecurityEvent(
+        "DASHBOARD_UNAUTHORIZED",
+        {
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse("Authentication required", 401);
+    }
+
+    // SECURITY: Rate limiting
+    if (!checkRateLimit(`user_${userId}`, 1000)) {
+      // 1000 requests per hour for users
+      logSecurityEvent(
+        "DASHBOARD_RATE_LIMITED",
+        {
+          userId,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Rate limit exceeded. Please try again later",
+        429
+      );
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const clerkId = searchParams.get("clerk_id");
+
+    // SECURITY: Users can only access their own dashboard data
+    const effectiveClerkId = clerkId || userId;
+    if (effectiveClerkId !== userId) {
+      logSecurityEvent(
+        "DASHBOARD_UNAUTHORIZED_ACCESS",
+        {
+          userId,
+          attemptedClerkId: effectiveClerkId,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Cannot access dashboard data for different user",
+        403
+      );
+    }
+
     // Get all devices for the user with IoT status
     const devicesRaw = await executeQuery<any[]>(
       `SELECT d.*, 
@@ -27,7 +76,7 @@ export async function GET(request: NextRequest) {
        LEFT JOIN iot_device_status ios ON d.serial_number = ios.serial_number
        WHERE d.clerk_id=? 
        ORDER BY d.created_at DESC`,
-      [clerkId]
+      [effectiveClerkId]
     );
 
     // Convert database 0/1 values to proper booleans
@@ -67,7 +116,7 @@ export async function GET(request: NextRequest) {
       `SELECT DISTINCT serial_number FROM device_serials 
        WHERE claimed_by_clerk_id = ? OR 
              serial_number IN (SELECT serial_number FROM devices WHERE clerk_id = ?)`,
-      [clerkId, clerkId]
+      [effectiveClerkId, effectiveClerkId]
     );
 
     // If user has claimed serials, get IoT events for those serials
@@ -167,7 +216,7 @@ export async function GET(request: NextRequest) {
       `SELECT COUNT(*) as count FROM notifications n
        JOIN devices d ON n.device_id = d.id
        WHERE d.clerk_id=?`,
-      [clerkId]
+      [effectiveClerkId]
     );
 
     const notificationCount = notificationResult[0]?.count || 0;
@@ -179,8 +228,29 @@ export async function GET(request: NextRequest) {
       notification_count: notificationCount,
     };
 
+    logSecurityEvent(
+      "DASHBOARD_DATA_RETRIEVED",
+      {
+        userId,
+        deviceCount: devices.length,
+        eventCount: recentEvents.length,
+        imageCount: recentImages.length,
+        notificationCount,
+      },
+      request
+    );
+
     return NextResponse.json(dashboardData);
   } catch (error) {
+    logSecurityEvent(
+      "DASHBOARD_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      request
+    );
+
     console.error("Error fetching dashboard data:", error);
     return NextResponse.json(
       { error: "Failed to fetch dashboard data" },

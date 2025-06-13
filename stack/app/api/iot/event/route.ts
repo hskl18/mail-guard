@@ -2,11 +2,55 @@ import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
 import { sendEventNotification } from "@/lib/email";
 import { clerkClient } from "@clerk/nextjs/server";
+import {
+  authenticateIoTDevice,
+  validateIoTEventPayload,
+  createSecurityResponse,
+  logSecurityEvent,
+} from "@/lib/api-security";
 
-// POST /api/iot/event - Push event from IoT device
+// POST /api/iot/event - Push event from IoT device (SECURED)
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Authenticate IoT device first
+    const authResult = await authenticateIoTDevice(request);
+
+    if (!authResult.success) {
+      logSecurityEvent(
+        "IOT_AUTH_FAILED",
+        {
+          error: authResult.error,
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        authResult.error || "Authentication failed",
+        authResult.statusCode || 401
+      );
+    }
+
     const body = await request.json();
+
+    // SECURITY: Validate request payload
+    const validation = validateIoTEventPayload(body);
+    if (!validation.valid) {
+      logSecurityEvent(
+        "IOT_INVALID_PAYLOAD",
+        {
+          errors: validation.errors,
+          deviceSerial: authResult.deviceSerial,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        `Invalid request: ${validation.errors.join(", ")}`,
+        400
+      );
+    }
+
     const {
       serial_number,
       event_data,
@@ -15,6 +59,20 @@ export async function POST(request: NextRequest) {
       battery_level,
       signal_strength,
     } = body;
+
+    // SECURITY: Verify the authenticated device matches the serial number in payload
+    if (authResult.deviceSerial && authResult.deviceSerial !== serial_number) {
+      logSecurityEvent(
+        "IOT_SERIAL_MISMATCH",
+        {
+          authenticatedSerial: authResult.deviceSerial,
+          payloadSerial: serial_number,
+        },
+        request
+      );
+
+      return createSecurityResponse("Device serial number mismatch", 403);
+    }
 
     if (!serial_number) {
       return NextResponse.json(
@@ -47,13 +105,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if device serial is valid
+    // Check if device serial is valid (additional validation beyond API key)
     const deviceSerial = await executeQuery<any[]>(
       "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = 1",
       [serial_number]
     );
 
     if (deviceSerial.length === 0) {
+      logSecurityEvent(
+        "IOT_INVALID_SERIAL",
+        {
+          serial_number,
+          deviceSerial: authResult.deviceSerial,
+        },
+        request
+      );
+
       return NextResponse.json(
         {
           error: "Invalid device serial number",
@@ -65,6 +132,19 @@ export async function POST(request: NextRequest) {
     }
 
     const serialInfo = deviceSerial[0];
+
+    // Log successful authentication and event processing
+    logSecurityEvent(
+      "IOT_EVENT_RECEIVED",
+      {
+        serial_number,
+        event_type: event_type || "inferred",
+        has_weight_data: weight_value !== undefined,
+        battery_level,
+        signal_strength,
+      },
+      request
+    );
 
     // Get last weight reading for comparison (if weight sensor data provided)
     let lastWeightReading = null;
@@ -342,6 +422,22 @@ export async function POST(request: NextRequest) {
         console.error("Email notification error:", emailError);
       }
 
+      // Log successful event processing
+      logSecurityEvent(
+        "IOT_EVENT_PROCESSED",
+        {
+          serial_number,
+          event_type: standardEventType,
+          device_id: deviceId,
+          detection_method: detectionMethod,
+          has_notification:
+            standardEventType === "open" ||
+            standardEventType === "delivery" ||
+            standardEventType === "removal",
+        },
+        request
+      );
+
       return NextResponse.json({
         message: "Event recorded successfully",
         event_id: (eventResult as any).insertId,
@@ -386,6 +482,18 @@ export async function POST(request: NextRequest) {
         [serial_number, standardEventType, JSON.stringify(enhancedEventData)]
       );
 
+      // Log unclaimed device event
+      logSecurityEvent(
+        "IOT_UNCLAIMED_EVENT",
+        {
+          serial_number,
+          event_type: standardEventType,
+          is_claimed: serialInfo.is_claimed,
+          detection_method: detectionMethod,
+        },
+        request
+      );
+
       return NextResponse.json({
         message: "IoT event recorded (unclaimed device)",
         iot_event_id: (iotEventResult as any).insertId,
@@ -408,6 +516,15 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
+    logSecurityEvent(
+      "IOT_EVENT_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      request
+    );
+
     console.error("IoT event error:", error);
     return NextResponse.json(
       {
@@ -419,9 +536,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET /api/iot/event?serial_number=XXX - Get recent events for IoT device
+// GET /api/iot/event?serial_number=XXX - Get recent events for IoT device (SECURED)
 export async function GET(request: NextRequest) {
   try {
+    // SECURITY: Authenticate IoT device first
+    const authResult = await authenticateIoTDevice(request);
+
+    if (!authResult.success) {
+      logSecurityEvent(
+        "IOT_GET_AUTH_FAILED",
+        {
+          error: authResult.error,
+          url: request.url,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        authResult.error || "Authentication failed",
+        authResult.statusCode || 401
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const serialNumber = searchParams.get("serial_number");
     const limit = parseInt(searchParams.get("limit") || "20");
@@ -430,6 +566,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: "Serial number parameter is required" },
         { status: 400 }
+      );
+    }
+
+    // SECURITY: Verify the authenticated device matches the requested serial number
+    if (authResult.deviceSerial && authResult.deviceSerial !== serialNumber) {
+      logSecurityEvent(
+        "IOT_GET_SERIAL_MISMATCH",
+        {
+          authenticatedSerial: authResult.deviceSerial,
+          requestedSerial: serialNumber,
+        },
+        request
+      );
+
+      return createSecurityResponse(
+        "Cannot access data for different device",
+        403
       );
     }
 
@@ -452,6 +605,16 @@ export async function GET(request: NextRequest) {
       [serialNumber]
     );
 
+    logSecurityEvent(
+      "IOT_EVENTS_RETRIEVED",
+      {
+        serial_number: serialNumber,
+        event_count: iotEvents.length,
+        limit,
+      },
+      request
+    );
+
     return NextResponse.json({
       serial_number: serialNumber,
       is_claimed: deviceSerial[0].is_claimed,
@@ -460,6 +623,14 @@ export async function GET(request: NextRequest) {
       total_events: iotEvents.length,
     });
   } catch (error) {
+    logSecurityEvent(
+      "IOT_GET_EVENTS_ERROR",
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      request
+    );
+
     console.error("IoT get events error:", error);
     return NextResponse.json(
       {

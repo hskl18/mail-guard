@@ -1,7 +1,7 @@
 /*
  * ESP32-CAM Main Code for Mail Guard System
  * This code is adapted from a tutorial by Rui Santos, Random Nerd Tutorials
- * and has been repurposed for a specific API endpoint.
+ * and has been repurposed for the MailGuard API endpoint.
  * Original project details at:
  * https://RandomNerdTutorials.com/esp32-cam-http-post-php-arduino/
  */
@@ -16,24 +16,19 @@
 #include <HardwareSerial.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include "time.h"
 
-// --- START: YOUR CONFIGURATION ---
+// === DEVICE CONFIGURATION ===
+const char *API_BASE_URL = "https://mail-guard-ten.vercel.app";
+const char *API_UPLOAD_PATH = "/api/iot/upload";
+const char *IOT_API_KEY = "iot_your_device_api_key_here"; // Replace with actual API key
+const char *DEVICE_SERIAL = "ESP32_001"; // Used for device identification
+const char *FIRMWARE_VERSION = "1.2.0";
+const int serverPort = 443; // HTTPS port
 
-// Replace with your WiFi network credentials
-// const char *ssid = WIFI_SSID;
-// const char *username = WIFI_USER;
-// const char *password = WIFI_PASSWORD;
-
+// === WiFi CONFIGURATION ===
 const char *ssid = "冰小六";
 const char *password = "";
-
-// Your API and Device Details
-const char *serverName = "mail-guard-ten.vercel.app";
-const char *serverPath = "/api/iot/upload";
-const char *SERIAL_NUMBER = "ESP32_001"; // Used for X-Device-ID header
-const int serverPort = 443;              // HTTPS port
-
-// --- END: YOUR CONFIGURATION ---
 
 // Pin definition for AI-THINKER Model (and ESP32-S)
 #define PWDN_GPIO_NUM 32
@@ -56,8 +51,29 @@ const int serverPort = 443;              // HTTPS port
 // Communication with ESP32 main
 HardwareSerial MainSerial(1);
 
+// NTP Time configuration
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 0;
+const int daylightOffset_sec = 0;
+
 void sendPhoto(); // Forward declaration
 ECE140_WIFI wifi_conn;
+
+String getCurrentISOTimestamp() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    // Fallback to millis if time sync failed
+    return String(millis());
+  }
+  
+  char timeString[30];
+  strftime(timeString, sizeof(timeString), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+  return String(timeString);
+}
+
+int getSignalStrength() {
+  return WiFi.RSSI();
+}
 
 void setup() {
   // Disable brownout detector for stability
@@ -67,30 +83,40 @@ void setup() {
   while (!Serial) {
     delay(10);
   }
-  Serial.println("ESP32-CAM starting up...");
+  
+  Serial.println("=================================");
+  Serial.println("MailGuard ESP32-CAM Starting...");
+  Serial.println("Firmware: " + String(FIRMWARE_VERSION));
+  Serial.println("Device: " + String(DEVICE_SERIAL));
+  Serial.println("=================================");
 
   // Initialize Serial1 for communication with ESP32 main
   MainSerial.begin(115200, SERIAL_8N1, 13, 12);
-  Serial.println(
-      "ESP32-CAM: Serial1 communication with main ESP32 initialized.");
+  Serial.println("[Serial] Communication with main ESP32 initialized");
 
   // Connect to Wi-Fi using ECE140_WIFI class
-  Serial.println("ESP32-CAM: Connecting to WiFi...");
+  Serial.println("[WiFi] Connecting to WiFi...");
   try {
     wifi_conn.connectToWiFi(ssid, password);
 
     if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("ESP32-CAM: WiFi connected successfully!");
-      Serial.print("ESP32-CAM IP Address: ");
+      Serial.println("[WiFi] Connected successfully!");
+      Serial.print("[WiFi] IP Address: ");
       Serial.println(WiFi.localIP());
+      Serial.print("[WiFi] Signal Strength: ");
+      Serial.print(WiFi.RSSI());
+      Serial.println(" dBm");
+      
+      // Initialize time
+      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+      Serial.println("[NTP] Time synchronization started");
     } else {
-      Serial.println("ESP32-CAM: WiFi connection failed!");
-      // Try to restart and reconnect
+      Serial.println("[WiFi] Connection failed!");
       delay(5000);
       ESP.restart();
     }
   } catch (...) {
-    Serial.println("ESP32-CAM: WiFi connection error occurred!");
+    Serial.println("[WiFi] Connection error occurred!");
     delay(5000);
     ESP.restart();
   }
@@ -123,30 +149,30 @@ void setup() {
     config.frame_size = FRAMESIZE_VGA; // 640x480
     config.jpeg_quality = 10;          // Good quality
     config.fb_count = 2;
-    Serial.println("ESP32-CAM: PSRAM found, using VGA resolution");
+    Serial.println("[Camera] PSRAM found, using VGA resolution");
   } else {
     config.frame_size = FRAMESIZE_QQVGA; // 160x120 - smallest resolution
     config.jpeg_quality = 20;            // Lower quality to reduce memory
     config.fb_count = 1;                 // Single frame buffer
     config.fb_location = CAMERA_FB_IN_DRAM; // Force to use DRAM
-    Serial.println("ESP32-CAM: No PSRAM, using QQVGA resolution for low memory");
+    Serial.println("[Camera] No PSRAM, using QQVGA resolution for low memory");
   }
 
   // Initialize the camera
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("ESP32-CAM: Camera init failed with error 0x%x\n", err);
+    Serial.printf("[Camera] Init failed with error 0x%x\n", err);
     delay(1000);
     ESP.restart();
   }
-  Serial.println("ESP32-CAM: Camera initialized successfully.");
-  Serial.println("ESP32-CAM: Ready and waiting for photo trigger commands...");
+  Serial.println("[Camera] Initialized successfully");
+  Serial.println("[Setup] Ready and waiting for photo trigger commands...");
 }
 
 void loop() {
   // Check WiFi connection status
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("ESP32-CAM: WiFi disconnected! Attempting to reconnect...");
+    Serial.println("[WiFi] Disconnected! Attempting to reconnect...");
     wifi_conn.connectToWiFi(ssid, password);
     delay(5000);
   }
@@ -155,8 +181,7 @@ void loop() {
   if (MainSerial.available()) {
     char command = MainSerial.read();
     if (command == 'T') {
-      Serial.println(
-          "ESP32-CAM: Received photo trigger command from ESP32 main!");
+      Serial.println("[Photo] Received trigger command from main ESP32!");
       sendPhoto();
     }
   }
@@ -165,14 +190,13 @@ void loop() {
   delay(10);
 }
 
-// Function to capture a photo and send it to the server with all required form
-// fields
+// Function to capture a photo and send it to the server using HTTPClient
 void sendPhoto() {
-  Serial.println("ESP32-CAM: Starting photo capture and upload...");
+  Serial.println("[Photo] Starting capture and upload...");
 
   // Check WiFi before attempting to send
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("ESP32-CAM: WiFi not connected, cannot send photo");
+    Serial.println("[Photo] WiFi not connected, cannot send photo");
     MainSerial.print('F'); // Send failure response
     return;
   }
@@ -180,87 +204,110 @@ void sendPhoto() {
   camera_fb_t *fb = NULL;
   fb = esp_camera_fb_get();
   if (!fb) {
-    Serial.println("ESP32-CAM: Camera capture failed");
+    Serial.println("[Photo] Camera capture failed");
     MainSerial.print('F'); // Send failure response to ESP32 main
     return;
   }
 
-  Serial.printf("ESP32-CAM: Photo captured, size: %d bytes\n", fb->len);
-  Serial.println("ESP32-CAM: Preparing to upload...");
-
-  WiFiClientSecure client;
-  client.setInsecure(); // For testing, bypass SSL certificate validation
-
-  Serial.printf("ESP32-CAM: Connecting to %s:%d\n", serverName, serverPort);
-
-  if (client.connect(serverName, serverPort)) {
-    Serial.println(
-        "ESP32-CAM: Server connection successful, uploading photo...");
-
-    String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-
-    // Construct the multipart form data payload
-    String head =
-        "--" + boundary + "\r\n" +
-        "Content-Disposition: form-data; name=\"serial_number\"\r\n\r\n" +
-        String(SERIAL_NUMBER) + "\r\n" + "--" + boundary + "\r\n" +
-        "Content-Disposition: form-data; name=\"file\"; "
-        "filename=\"esp32-cam.jpg\"\r\n" +
-        "Content-Type: image/jpeg\r\n" + "\r\n";
-
-    String tail = "\r\n--" + boundary + "--\r\n";
-
-    // Calculate the total length of the request body
-    uint32_t totalLen = head.length() + fb->len + tail.length();
-
-    // Send the main HTTP headers
-    client.println("POST " + String(serverPath) + " HTTP/1.1");
-    client.println("Host: " + String(serverName));
-    client.println("Content-Length: " + String(totalLen));
-    client.println("Content-Type: multipart/form-data; boundary=" + boundary);
-    client.println();
-
-    // Send the request body
-    client.print(head);
-    client.write(fb->buf, fb->len);
-    client.print(tail);
-
-    // Return the frame buffer to be reused
+  Serial.printf("[Photo] Captured, size: %d bytes\n", fb->len);
+  
+  // Validate image size (max 10MB as per API docs)
+  if (fb->len > 10 * 1024 * 1024) {
+    Serial.println("[Photo] Image too large, rejecting");
     esp_camera_fb_return(fb);
+    MainSerial.print('F');
+    return;
+  }
 
-    // Wait for and check the server's response
-    Serial.println(
-        "ESP32-CAM: Upload complete, waiting for server response...");
-    long startTimer = millis();
-    bool uploadSuccess = false;
+  HTTPClient http;
+  String url = String(API_BASE_URL) + String(API_UPLOAD_PATH);
+  
+  Serial.println("[Photo] Uploading to: " + url);
 
-    while (client.connected() &&
-           (millis() - startTimer < 10000)) { // 10-second timeout
-      if (client.available()) {
-        String line = client.readStringUntil('\n');
-        Serial.println("ESP32-CAM: " + line);
+  http.begin(url);
+  
+  // Add authentication and headers
+  http.addHeader("Authorization", "Bearer " + String(IOT_API_KEY));
+  http.addHeader("User-Agent", "MailGuard-ESP32CAM/" + String(FIRMWARE_VERSION));
 
-        // Check for successful HTTP response
-        if (line.indexOf("HTTP/1.1 200") >= 0 ||
-            line.indexOf("HTTP/1.1 201") >= 0) {
-          uploadSuccess = true;
-        }
-      }
-    }
-    client.stop();
+  // Create multipart form data
+  String boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+  String contentType = "multipart/form-data; boundary=" + boundary;
+  
+  // Build form data
+  String formStart = "--" + boundary + "\r\n";
+  
+  // Add serial number field
+  formStart += "Content-Disposition: form-data; name=\"serial_number\"\r\n\r\n";
+  formStart += String(DEVICE_SERIAL) + "\r\n";
+  formStart += "--" + boundary + "\r\n";
+  
+  // Add file type field
+  formStart += "Content-Disposition: form-data; name=\"file_type\"\r\n\r\n";
+  formStart += "image\r\n";
+  formStart += "--" + boundary + "\r\n";
+  
+  // Add timestamp field
+  formStart += "Content-Disposition: form-data; name=\"timestamp\"\r\n\r\n";
+  formStart += getCurrentISOTimestamp() + "\r\n";
+  formStart += "--" + boundary + "\r\n";
+  
+  // Add file field header
+  formStart += "Content-Disposition: form-data; name=\"file\"; filename=\"mailbox_";
+  formStart += getCurrentISOTimestamp() + ".jpg\"\r\n";
+  formStart += "Content-Type: image/jpeg\r\n\r\n";
 
-    if (uploadSuccess) {
-      Serial.println("ESP32-CAM: Photo upload successful!");
+  String formEnd = "\r\n--" + boundary + "--\r\n";
+
+  // Calculate total content length
+  size_t totalLength = formStart.length() + fb->len + formEnd.length();
+  
+  // Create complete payload
+  uint8_t* payload = (uint8_t*)malloc(totalLength);
+  if (!payload) {
+    Serial.println("[Photo] Failed to allocate memory for upload");
+    esp_camera_fb_return(fb);
+    MainSerial.print('F');
+    return;
+  }
+  
+  // Copy form data
+  size_t offset = 0;
+  memcpy(payload + offset, formStart.c_str(), formStart.length());
+  offset += formStart.length();
+  
+  memcpy(payload + offset, fb->buf, fb->len);
+  offset += fb->len;
+  
+  memcpy(payload + offset, formEnd.c_str(), formEnd.length());
+  
+  // Set content type and length
+  http.addHeader("Content-Type", contentType);
+  http.addHeader("Content-Length", String(totalLength));
+
+  Serial.println("[Photo] Sending HTTP POST...");
+  int httpResponseCode = http.POST(payload, totalLength);
+  
+  // Clean up
+  free(payload);
+  esp_camera_fb_return(fb);
+
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.printf("[Photo] Response code: %d\n", httpResponseCode);
+    Serial.println("[Photo] Response: " + response);
+
+    if (httpResponseCode >= 200 && httpResponseCode < 300) {
+      Serial.println("[Photo] Upload successful!");
       MainSerial.print('S'); // Send success response to ESP32 main
     } else {
-      Serial.println(
-          "ESP32-CAM: Photo upload failed - no success response from server");
+      Serial.println("[Photo] Upload failed - server error");
       MainSerial.print('F'); // Send failure response to ESP32 main
     }
-
   } else {
-    Serial.println("ESP32-CAM: Failed to connect to server");
-    esp_camera_fb_return(fb);
+    Serial.printf("[Photo] HTTP error: %s\n", http.errorToString(httpResponseCode).c_str());
     MainSerial.print('F'); // Send failure response to ESP32 main
   }
+
+  http.end();
 }

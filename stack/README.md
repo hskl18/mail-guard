@@ -1,141 +1,692 @@
-# Smart Mailbox Frontend
+# MailGuard Next.js Application
 
-A web application for monitoring smart mailbox devices in real-time.
+The core web application for the MailGuard smart mailbox security system. Built with Next.js 15, featuring enterprise-grade security, real-time monitoring, and comprehensive device management.
 
-## Technology Stack
+---
 
-- Next.js 15 (App Router)
-- React 19 & TypeScript
-- Tailwind CSS & shadcn/ui
-- Clerk for authentication
-- Recharts, Lucide icons, React Hook Form, etc.
+## 🏗️ Architecture Overview
 
-## Prerequisites
+### **Technology Stack**
 
-- Node.js 18.x or higher
-- pnpm or npm
-- Clerk account (obtain API keys)
+- **Framework**: Next.js 15 with App Router
+- **Language**: TypeScript for type safety
+- **Authentication**: Clerk for secure user management
+- **Database**: MySQL with connection pooling
+- **Storage**: AWS S3 for secure image storage
+- **Styling**: Tailwind CSS with shadcn/ui components
+- **Email**: MailerSend for notification delivery
+- **Security**: Multi-tier API authentication with rate limiting
 
-## Getting Started
+### **Application Structure**
 
-1. Install dependencies:
-
-   ```bash
-   cd frontend
-   pnpm install
-   # or npm install
-   ```
-
-2. Configure environment variables:
-
-   Create `.env.local` in `frontend/`:
-
-   ```env
-   NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-   NEXT_PUBLIC_CLERK_SECRET_KEY=your_clerk_secret_key
-
-   # MailerSend Configuration (for email notifications)
-   MAILERSEND_API_KEY=your_mailersend_api_key
-   MAILERSEND_FROM_EMAIL=your_verified_email@yourdomain.com
-   MAILERSEND_FROM_NAME="Mail Guard"
-   NEXT_PUBLIC_APP_URL=https://your-app-url.com
-   ```
-
-3. Run development server:
-
-   ```bash
-   pnpm dev
-   # or npm run dev
-   ```
-
-4. Open in browser: `http://localhost:3000`
-
-## Build for Production
-
-```bash
-pnpm build
-pnpm start
+```
+stack/
+├── app/                      # Next.js App Router
+│   ├── api/                  # API Routes (Backend)
+│   │   ├── iot/              # IoT Device Endpoints
+│   │   │   ├── event/        # Core event processing
+│   │   │   ├── upload/       # Image upload handling
+│   │   │   ├── activate/     # Device registration
+│   │   │   └── report/       # Legacy reporting
+│   │   ├── devices/          # Device Management
+│   │   ├── dashboard/        # Dashboard Data
+│   │   ├── community-reports/# Community Features
+│   │   ├── image/[id]/       # Secure Image Proxy
+│   │   ├── init-db/          # Database Setup
+│   │   └── docs/             # API Documentation
+│   ├── dashboard/            # Dashboard Pages
+│   ├── connect-device/       # Device Onboarding
+│   ├── delivery-hub/         # Delivery Management
+│   ├── docs/                 # Documentation Pages
+│   ├── (Auth)/               # Authentication Pages
+│   ├── layout.tsx            # Root Layout
+│   ├── page.tsx              # Landing Page
+│   ├── globals.css           # Global Styles
+│   └── not-found.tsx         # 404 Page
+├── components/               # React Components
+│   ├── ui/                   # shadcn/ui Base Components
+│   ├── dashboard.tsx         # Main Dashboard (1089 lines)
+│   ├── settings.tsx          # Device Settings (786 lines)
+│   ├── notifications.tsx     # Notification Center (504 lines)
+│   ├── committee.tsx         # Community Management (755 lines)
+│   ├── landing-page.tsx      # Landing Page (660 lines)
+│   ├── authenticated-app.tsx # App Shell (163 lines)
+│   ├── client-provider.tsx   # Client Setup
+│   └── user-nav.tsx          # User Navigation
+├── lib/                      # Core Libraries
+│   ├── api-security.ts       # Security System (481 lines)
+│   ├── db.ts                 # Database Layer (150 lines)
+│   ├── email.ts              # Email Service (199 lines)
+│   ├── s3.ts                 # AWS S3 Integration (130 lines)
+│   ├── types.ts              # TypeScript Definitions (119 lines)
+│   └── utils.ts              # Utility Functions (7 lines)
+├── hooks/                    # Custom React Hooks
+├── styles/                   # Additional Stylesheets
+├── public/                   # Static Assets
+├── middleware.ts             # Next.js Middleware (52 lines)
+└── Configuration Files
+    ├── package.json          # Dependencies (78 lines)
+    ├── tsconfig.json         # TypeScript Config
+    ├── tailwind.config.ts    # Tailwind CSS Config
+    ├── next.config.js        # Next.js Config (51 lines)
+    ├── next.config.mjs       # Alternative Config (15 lines)
+    ├── postcss.config.mjs    # PostCSS Config
+    └── components.json       # shadcn/ui Config
 ```
 
-Deploy with Vercel, Netlify, or any Node.js hosting.
+---
 
-## Environment Variables
+## 🛡️ Security Implementation
 
-- `NEXT_PUBLIC_API_BASE_URL`: Base URL for backend API
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key
-- `NEXT_PUBLIC_CLERK_SECRET_KEY`: Clerk secret key
-- `MAILERSEND_API_KEY`: MailerSend API key for email notifications
-- `MAILERSEND_FROM_EMAIL`: Verified email address for sending notifications
-- `MAILERSEND_FROM_NAME`: Name to display as sender (default: "Mail Guard")
-- `NEXT_PUBLIC_APP_URL`: URL of your deployed application
+### **Multi-Tier Authentication System**
 
-## License
+#### **1. IoT Device Authentication** (`lib/api-security.ts`)
 
-MIT License
+- **API Key Format**: `iot_` prefix + 64-character hex string
+- **Rate Limiting**: 100 requests/hour per device
+- **Device Verification**: Serial number validation against API key
+- **Automatic Registration**: New devices auto-register with valid API keys
 
-# Smart Mailbox Monitor
+```typescript
+// IoT Authentication Flow
+const authResult = await authenticateIoTDevice(request);
+if (!authResult.success) {
+  logSecurityEvent("IOT_AUTH_FAILED", { error: authResult.error }, request);
+  return createSecurityResponse("Authentication failed", 401);
+}
+```
 
-A modern web application for monitoring your mailbox in real-time. This project provides a user interface for a smart device that detects mail delivery, mailbox access, and captures images for security.
+#### **2. User Authentication** (Clerk Integration)
 
-<!-- ![Smart Mailbox Monitor Dashboard](/placeholder.svg?height=400&width=800) -->
+- **Session Management**: Secure JWT-based sessions
+- **Rate Limiting**: 1000 requests/hour per user
+- **Authorization**: Users can only access their own data
+- **Protected Routes**: All dashboard routes require authentication
 
-## 📋 Overview
+#### **3. Admin Authentication**
 
-The Smart Mailbox Monitor is designed to add security to your mailbox and prevent mail theft. The system consists of a hardware device that attaches inside a standard mailbox and a web application for monitoring and configuration.
+- **API Key Format**: `admin_` prefix + 128-character hex string
+- **Rate Limiting**: 10000 requests/hour per admin
+- **Privileged Operations**: Database initialization, system management
 
-The hardware device uses sensors to detect:
+### **Security Features**
 
-- When mail is delivered
-- When the mailbox is opened/closed
-- When mail is removed
-- It also captures images when these events occur
+- **Rate Limiting**: Per-user/device request throttling
+- **Input Validation**: Comprehensive payload validation
+- **Authorization Checks**: Resource ownership verification
+- **Audit Logging**: Complete security event logging
+- **CORS Protection**: Proper origin control
+- **Security Headers**: XSS, clickjacking, and content-type protection
 
-This repository contains the frontend web application that communicates with the hardware device through a cloud backend.
+---
 
-## ✨ Features
+## 📡 API Endpoints
 
-### Authentication
+### **IoT Device Endpoints** (API Key Required)
 
-- Secure user authentication with Clerk
+#### `POST /api/iot/event` - Core Event Processing
+
+**Purpose**: Primary endpoint for IoT devices to submit mailbox events
+
+**Authentication**: IoT API Key required
+**Rate Limit**: 100 requests/hour per device
+
+**Request Body**:
+
+```json
+{
+  "serial_number": "SN001234567",
+  "event_data": {
+    "reed_sensor": true,
+    "event_type": "open",
+    "weight_value": 125.5,
+    "weight_threshold": 50
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "firmware_version": "1.2.0",
+  "battery_level": 85,
+  "signal_strength": -45
+}
+```
+
+**Features**:
+
+- Weight sensor integration
+- Automatic event type inference
+- Device health monitoring
+- Email notifications
+- Photo evidence linking
+
+#### `POST /api/iot/upload` - Image Upload
+
+**Purpose**: Secure image upload for photo evidence
+
+**Authentication**: IoT API Key required
+**Content Type**: `multipart/form-data`
+**File Limits**: Max 10MB, images only
+
+**Form Data**:
+
+- `file`: Image file
+- `serial_number`: Device serial
+- `event_type`: Event type (delivery/mail_delivered)
+- `timestamp`: Optional timestamp
+
+#### `POST /api/iot/activate` - Device Registration
+
+**Purpose**: IoT device registration and validation
+
+**Features**:
+
+- Automatic serial number creation
+- Device status tracking
+- Firmware version management
+
+#### `GET /api/iot/report` - Legacy Reporting
+
+**Purpose**: Simplified event reporting for legacy devices
+
+**Query Parameters**:
+
+- `d` or `device_name`: Device identifier
+- `e`: Event code (o=open, c=close, d=delivery, r=removal)
+
+### **User Dashboard Endpoints** (Clerk Auth Required)
+
+#### `GET /api/dashboard` - Dashboard Data
+
+**Purpose**: Comprehensive dashboard data for authenticated user
+
+**Returns**:
+
+- User devices with IoT status
+- Recent events (dashboard + IoT)
+- Recent images
+- Notification count
+
+#### `GET/POST /api/devices` - Device Management
+
+**Purpose**: User device registration and management
+
+**GET Features**:
+
+- User's devices only
+- Filter by name, status
+- Device health information
+
+**POST Features**:
+
+- One device per user limit
+- Serial number validation
+- Automatic device configuration
+
+#### `GET /api/image/[id]` - Secure Image Access
+
+**Purpose**: Authorized image access with ownership verification
+
+**Security**:
+
+- User must own the device that captured the image
+- Private caching headers
+- S3 proxy for secure access
+
+### **Community Endpoints** (Clerk Auth Required)
+
+#### `GET/POST /api/community-reports` - Community Safety
+
+**Purpose**: Community incident reporting and management
+
+**Features**:
+
+- Zip code-based filtering
+- Status tracking (pending/reviewed/resolved)
+- Image attachment support
+- Input validation and sanitization
+
+#### `PATCH /api/community-reports` - Report Management
+
+**Purpose**: Update report status (for committee members)
+
+### **Admin Endpoints** (Admin API Key Required)
+
+#### `POST /api/init-db` - Database Initialization
+
+**Purpose**: Complete database schema setup
+
+**Features**:
+
+- Creates all required tables
+- Sets up security tables
+- Generates sample data
+- Creates admin API keys
+
+### **Documentation Endpoint**
+
+#### `GET /api/docs` - API Documentation
+
+**Purpose**: Interactive Swagger UI documentation
+
+**Features**:
+
+- Complete API specification
+- Interactive testing interface
+- Authentication examples
+- Response schemas
+
+---
+
+## 🎨 Frontend Components
+
+### **Core Components**
+
+#### `components/dashboard.tsx` (1089 lines)
+
+**Purpose**: Main dashboard interface with real-time monitoring
+
+**Features**:
+
+- Device status display
+- Event timeline
+- Battery monitoring
+- Photo gallery
+- Real-time updates
+
+#### `components/settings.tsx` (786 lines)
+
+**Purpose**: Comprehensive device configuration
+
+**Features**:
+
+- Notification preferences
+- Device configuration
+- WiFi management
+- Account settings
+- Security settings
+
+#### `components/notifications.tsx` (504 lines)
+
+**Purpose**: Notification center with filtering
+
+**Features**:
+
+- Event notifications
+- Image viewing
+- Filter by type/date
+- Mark as read
+- Email preferences
+
+#### `components/committee.tsx` (755 lines)
+
+**Purpose**: Community management interface
+
+**Features**:
+
+- Community reports
+- Report status management
+- Community statistics
+- Committee tools
+
+#### `components/landing-page.tsx` (660 lines)
+
+**Purpose**: Marketing and information landing page
+
+**Features**:
+
+- Product showcase
+- Feature highlights
+- Pricing information
+- Getting started guide
+
+### **UI Components** (`components/ui/`)
+
+- Complete shadcn/ui component library
+- Consistent design system
+- Accessible components
+- Dark/light mode support
+
+---
+
+## 🗄️ Database Layer
+
+### **Core Functions** (`lib/db.ts`)
+
+#### `executeQuery<T>(query: string, params?: any[])`
+
+**Purpose**: Type-safe database query execution
+
+**Features**:
+
+- Connection pooling
+- SSL support
+- Error handling
+- TypeScript generics
+
+**Usage**:
+
+```typescript
+const devices = await executeQuery<Device[]>(
+  "SELECT * FROM devices WHERE clerk_id = ?",
+  [userId]
+);
+```
+
+### **Database Tables**
+
+#### **Security Tables**
+
+- `api_keys`: API key management with hashing
+- `security_events`: Comprehensive audit logging
+
+#### **Device Tables**
+
+- `device_serials`: Valid device serial numbers
+- `iot_device_status`: Runtime device status
+- `devices`: User-registered dashboard devices
+
+#### **Event Tables**
+
+- `events`: Dashboard device events
+- `iot_events`: Unclaimed device events
+- `images`: Dashboard device images
+- `iot_images`: Unclaimed device images
+
+#### **User Tables**
+
+- `notifications`: User notifications
+- `device_health`: Device health metrics
+- `community_reports`: Community safety reports
+
+---
+
+## ☁️ External Integrations
+
+### **AWS S3 Integration** (`lib/s3.ts`)
+
+#### `uploadToS3(buffer: Buffer, key: string, contentType: string)`
+
+**Purpose**: Secure image upload to S3
+
+**Features**:
+
+- Automatic content type detection
+- Unique file naming
+- Error handling
+- Metadata tagging
+
+#### `getFromS3(key: string)`
+
+**Purpose**: Secure image retrieval from S3
+
+**Features**:
+
+- Stream handling
+- Error handling
+- Content type preservation
+
+### **Email Service** (`lib/email.ts`)
+
+#### `sendEventNotification(params: NotificationParams)`
+
+**Purpose**: Event-based email notifications
+
+**Features**:
+
+- HTML email templates
+- Image attachments
+- Error handling
+- Delivery tracking
+
+#### **Email Templates**:
+
+- Mail delivery notifications
+- Mailbox access alerts
+- Battery level warnings
+- Security incident reports
+
+### **Clerk Authentication**
+
+- User registration and login
+- Session management
 - User profile management
-- Protected routes for authenticated users only
+- Protected route handling
 
-### Dashboard
+---
 
-- Real-time mailbox status monitoring (open/closed)
-- Mail presence indicator
-- Battery level monitoring with low battery alerts
-- Recent activity timeline
-- Quick actions for common tasks
+## 🔧 Configuration & Setup
 
-### Notifications
+### **Environment Variables**
 
-- Comprehensive notification system for all mailbox events
-- Filtering options by notification type
-- Image viewing for mail delivery and mailbox access events
-- Visual indicators for different notification types
+#### **Required Variables**:
 
-### Settings
+```env
+# Database
+DATABASE_URL=mysql://user:pass@host:port/database
+MYSQL_SSL_CA=path/to/ca-cert.pem
 
-- Customizable notification preferences
-- Device configuration (check intervals, battery thresholds)
-- Camera settings for image capture
-- Account management and security settings
-- WiFi connectivity management
+# Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 
-## 🛠️ Technology Stack
+# Storage
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=us-east-1
+S3_BUCKET=your-mailguard-bucket
 
-- **Frontend**: Next.js, React, TypeScript
-- **UI Components**: shadcn/ui, Tailwind CSS
-- **Icons**: Lucide React
-- **Authentication**: Clerk
-- **State Management**: React Hooks
+# Email
+MAILERSEND_API_KEY=mlsn...
+MAILERSEND_FROM_EMAIL=noreply@yourdomain.com
+MAILERSEND_FROM_NAME="Mail Guard Security"
 
-## 🚀 Getting Started
+# Security
+IOT_API_SECRET_KEY=your-iot-secret
+ADMIN_API_SECRET_KEY=your-admin-secret
+API_ENCRYPTION_SECRET=your-encryption-secret
 
-### Prerequisites
+# Application
+NEXT_PUBLIC_APP_URL=https://your-domain.com
+```
 
-- Node.js 18.x or higher
-- npm or yarn
-- Clerk account (for authentication)
+### **Development Setup**
+
+```bash
+# Install dependencies
+pnpm install
+
+# Set up environment
+cp .env.example .env.local
+# Edit .env.local with your values
+
+# Initialize database
+curl -X POST http://localhost:3000/api/init-db \
+  -H "Authorization: Bearer admin_your_admin_api_key"
+
+# Start development server
+pnpm dev
+```
+
+### **Production Deployment**
+
+#### **Build Process**:
+
+```bash
+pnpm build    # TypeScript compilation & optimization
+pnpm start    # Production server
+```
+
+#### **Deployment Platforms**:
+
+- **Vercel** (Recommended): Automatic deployments
+- **Railway**: Container-based deployment
+- **DigitalOcean App Platform**: Managed hosting
+- **AWS Amplify**: Full-stack hosting
+
+### **Configuration Files**
+
+#### `next.config.js` - Next.js Configuration
+
+**Features**:
+
+- Bundle optimization
+- Image domains configuration
+- Webpack customization
+- Performance optimization
+
+#### `middleware.ts` - Request Middleware
+
+**Features**:
+
+- CORS headers for API routes
+- Protected route handling
+- Request preprocessing
+
+#### `tailwind.config.ts` - Styling Configuration
+
+**Features**:
+
+- Custom color scheme
+- Component styles
+- Responsive breakpoints
+- Dark mode support
+
+---
+
+## 🧪 Testing & Validation
+
+### **API Testing**
+
+```bash
+cd ../api_test
+python test_iot_data.py
+```
+
+### **Security Testing**
+
+- Rate limit validation
+- Authentication bypass testing
+- Authorization verification
+- Input validation testing
+- CORS policy testing
+
+### **Performance Testing**
+
+- Database query optimization
+- Image upload performance
+- API response times
+- Frontend rendering performance
+
+---
+
+## 📈 Performance & Optimization
+
+### **Bundle Optimization**
+
+- Code splitting for efficient loading
+- AWS SDK optimization
+- MySQL client optimization
+- Tree shaking for unused code
+
+### **Database Optimization**
+
+- Connection pooling
+- Query optimization
+- Index usage
+- SSL connections
+
+### **Image Optimization**
+
+- WebP format support
+- Responsive image loading
+- S3 CDN integration
+- Secure image proxy
+
+---
+
+## 🚀 Deployment Guide
+
+### **Environment Setup**
+
+1. **Database Setup** (Aiven MySQL):
+
+   - Create MySQL database
+   - Configure SSL certificates
+   - Set up connection pooling
+
+2. **Storage Setup** (AWS S3):
+
+   - Create S3 bucket
+   - Configure CORS policy
+   - Set up IAM user with S3 access
+
+3. **Authentication Setup** (Clerk):
+
+   - Create Clerk application
+   - Configure authentication providers
+   - Set up webhooks (optional)
+
+4. **Email Setup** (MailerSend):
+   - Create MailerSend account
+   - Verify sending domain
+   - Generate API key
+
+### **Production Checklist**
+
+- ✅ Environment variables configured
+- ✅ Database schema initialized
+- ✅ Admin API key generated
+- ✅ S3 bucket and IAM configured
+- ✅ Clerk authentication configured
+- ✅ MailerSend domain verified
+- ✅ SSL certificates installed
+- ✅ Security headers configured
+- ✅ Rate limiting configured
+- ✅ Error monitoring set up
+
+---
+
+## 📊 Monitoring & Analytics
+
+### **Built-in Monitoring**
+
+- Security event logging
+- Authentication tracking
+- API usage metrics
+- Error tracking
+
+### **Recommended External Tools**
+
+- **Vercel Analytics**: Performance monitoring
+- **Sentry**: Error tracking
+- **LogRocket**: User session recording
+- **Mixpanel**: User analytics
+
+---
+
+## 🔄 Maintenance & Updates
+
+### **Regular Maintenance**
+
+- Security event log review
+- Database performance monitoring
+- API usage analysis
+- User feedback review
+
+### **Update Process**
+
+- Dependency updates
+- Security patches
+- Feature additions
+- Bug fixes
+
+---
+
+## 📞 Support & Documentation
+
+- **API Documentation**: `/api/docs` (Interactive Swagger UI)
+- **Component Storybook**: Coming soon
+- **Developer Guide**: This README
+- **Security Guide**: See main repository README
+
+---
+
+**Built with ❤️ using Next.js 15, TypeScript, and enterprise-grade security practices.**

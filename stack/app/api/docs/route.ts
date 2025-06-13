@@ -42,7 +42,12 @@ const API_DOCS = {
         tags: ["🌐 IoT Core"],
         summary: "🚨 MAIN ENDPOINT: Receive IoT Events",
         description:
-          "Primary endpoint for IoT devices to send mailbox events (open, close, delivery, removal)",
+          "Primary endpoint for IoT devices to send mailbox events (open, close, delivery, removal). Requires IoT API key authentication. Rate limited to 100 requests/hour per device.",
+        security: [
+          {
+            ApiKeyAuth: [],
+          },
+        ],
         requestBody: {
           required: true,
           content: {
@@ -304,7 +309,13 @@ const API_DOCS = {
       post: {
         tags: ["🌐 IoT Core"],
         summary: "📊 Device Status Reports",
-        description: "Periodic health and status reports from IoT devices",
+        description:
+          "Periodic health and status reports from IoT devices. Requires IoT API key authentication. Used for heartbeat monitoring and battery warnings.",
+        security: [
+          {
+            ApiKeyAuth: [],
+          },
+        ],
         requestBody: {
           required: true,
           content: {
@@ -320,21 +331,28 @@ const API_DOCS = {
                   },
                   firmware_version: {
                     type: "string",
+                    description: "Current firmware version",
                     example: "1.2.0",
                   },
                   battery_level: {
                     type: "integer",
                     minimum: 0,
                     maximum: 100,
+                    description: "Battery level percentage",
                     example: 75,
                   },
                   signal_strength: {
                     type: "integer",
+                    minimum: -120,
+                    maximum: 0,
+                    description: "WiFi signal strength in dBm",
                     example: -55,
                   },
                   temperature_celsius: {
                     type: "integer",
-                    description: "Device temperature",
+                    minimum: -50,
+                    maximum: 80,
+                    description: "Device temperature in Celsius",
                     example: 25,
                   },
                 },
@@ -345,6 +363,45 @@ const API_DOCS = {
         responses: {
           "200": {
             description: "Status report received successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                      example: "Status report received successfully",
+                    },
+                    timestamp: {
+                      type: "string",
+                      format: "date-time",
+                      example: "2024-01-15T10:30:00Z",
+                    },
+                    status: {
+                      type: "string",
+                      example: "acknowledged",
+                    },
+                    battery_warning: {
+                      type: "boolean",
+                      description: "True if battery level is below 20%",
+                      example: false,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid input data",
+          },
+          "401": {
+            description: "Authentication failed",
+          },
+          "403": {
+            description: "Device serial number mismatch",
+          },
+          "404": {
+            description: "Device not found",
           },
         },
       },
@@ -521,6 +578,21 @@ const API_DOCS = {
     },
   },
   components: {
+    securitySchemes: {
+      ApiKeyAuth: {
+        type: "apiKey",
+        in: "header",
+        name: "Authorization",
+        description:
+          "IoT API key authentication. Use format: 'Bearer iot_your_api_key_here'",
+      },
+      ClerkAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Clerk user authentication token",
+      },
+    },
     schemas: {
       Device: {
         type: "object",
