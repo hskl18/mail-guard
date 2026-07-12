@@ -6,8 +6,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
-  title: "Mail Guard",
-  description: "Monitor your mailbox in real-time",
+  title: "Mail Guard - IoT Mailbox Monitoring Prototype",
+  description:
+    "A full-stack prototype for authenticated mailbox events, image evidence, and dashboard monitoring.",
 };
 
 export default function RootLayout({
