@@ -1,40 +1,25 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import {
   Mail,
   Shield,
-  Bell,
   ArrowRight,
-  Check,
-  Info,
-  CreditCard,
-  HelpCircle,
   Star,
   Building,
   Home,
   School,
   Briefcase,
   Package,
-  Camera,
   Users,
   Clock,
-  Battery,
-  BellRing,
-  Wifi,
   Settings,
-  Server,
-  ArrowLeft,
   AlertTriangle,
   DollarSign,
-  ThermometerSnowflake,
   Zap,
   CheckCircle,
-  Lock,
-  Percent,
-  UserPlus,
-  BarChart,
   Snowflake,
   Monitor,
   MapPin,
@@ -44,19 +29,16 @@ import {
   TrendingUp,
   Eye,
 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -205,10 +187,12 @@ export default function DeliveryHubPage() {
               <div className="flex items-center justify-center">
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-2xl blur-2xl opacity-20 scale-105"></div>
-                  <img
+                  <Image
                     alt="Campus Delivery Hub"
                     className="relative w-full max-w-lg rounded-2xl shadow-2xl object-cover border border-gray-200"
-                    src="case.png"
+                    src="/case.png"
+                    width={960}
+                    height={640}
                   />
                 </div>
               </div>
@@ -391,7 +375,7 @@ export default function DeliveryHubPage() {
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
                       DoorDash, Uber Eats, Grubhub partnerships with special
-                      refrigerated "Food Locker" agreements.
+                      refrigerated &quot;Food Locker&quot; agreements.
                     </p>
                   </div>
                 </div>
@@ -1051,7 +1035,7 @@ export default function DeliveryHubPage() {
                     </h4>
                   </div>
                   <ul className="space-y-2 text-sm text-gray-600">
-                    <li>• 8' x 6' footprint minimum</li>
+                    <li>• 8&apos; x 6&apos; footprint minimum</li>
                     <li>• Weather-protected location</li>
                     <li>• ADA-compliant access</li>
                     <li>• Vehicle loading zone nearby</li>
@@ -1143,8 +1127,8 @@ export default function DeliveryHubPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 leading-relaxed">
-                    Unique to campus environment: "Hub Status" widget in student
-                    portal, and push notifications via the university's official
+                    Unique to campus environment: &quot;Hub Status&quot; widget in student
+                    portal, and push notifications via the university&apos;s official
                     app or housing management system.
                   </p>
                 </CardContent>

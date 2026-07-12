@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: mailguard_test
+          MYSQL_ROOT_PASSWORD: test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ptest-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      API_ENCRYPTION_SECRET: 0000000000000000000000000000000000000000000000000000000000000000
+      AWS_ACCESS_KEY_ID: offline
+      AWS_REGION: us-east-1
+      AWS_SECRET_ACCESS_KEY: offline
+      CLERK_SECRET_KEY: sk_test_offline_placeholder
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jb20k
+      RESEND_API_KEY: re_offline_placeholder
+      RESEND_FROM_EMAIL: noreply@example.com
+      RESEND_FROM_NAME: MailGuard
+      S3_BUCKET: offline-bucket
+      MYSQL_DATABASE: mailguard_test
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PASSWORD: test-password
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+    defaults:
+      run:
+        working-directory: stack
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: stack/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
+      - name: Test offline migrations
+        run: pnpm test
+
+      - name: Apply migrations twice
+        env:
+          DATABASE_MIGRATION_CONFIRM: apply
+          DATABASE_MIGRATION_TARGET: 127.0.0.1/mailguard_test
+        run: |
+          pnpm db:migrate -- --apply
+          pnpm db:migrate -- --apply
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build

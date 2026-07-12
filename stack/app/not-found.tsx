@@ -36,7 +36,7 @@ export default function NotFound() {
                 Page Not Found
               </h2>
               <p className="text-gray-500 max-w-md">
-                The page you're looking for doesn't exist. You'll be
+                The page you&apos;re looking for doesn&apos;t exist. You&apos;ll be
                 automatically redirected to the homepage in a few seconds.
               </p>
             </div>

@@ -1,6 +1,4 @@
 import { SignUp } from "@clerk/nextjs";
-import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { Mail, ArrowLeft, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";

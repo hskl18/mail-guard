@@ -1,32 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import { auth } from "@clerk/nextjs/server";
+import { executeQuery, type DatabaseRows } from "@/lib/db";
+import { createDeviceOwnershipScope } from "@/lib/device-ownership.mjs";
 
 // GET /api/devices/[id]/settings - Get device settings
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { searchParams } = new URL(request.url);
-    const clerkId = searchParams.get("clerk_id");
+    const { userId } = await auth();
     const resolvedParams = await params;
     const deviceId = resolvedParams.id;
+    const ownership = createDeviceOwnershipScope(deviceId, userId);
 
-    if (!clerkId) {
+    if (!ownership) {
       return NextResponse.json(
-        { error: "clerk_id parameter is required" },
-        { status: 400 }
+        { error: "Authentication required" },
+        { status: 401 }
       );
     }
 
     // Verify device ownership and get settings
-    const devices = await executeQuery<any[]>(
+    const devices = await executeQuery<DatabaseRows>(
       `SELECT id, clerk_id, name, location, is_active,
               mail_delivered_notify, mailbox_opened_notify, mail_removed_notify,
               email_notifications, check_interval, battery_threshold,
               capture_image_on_open, capture_image_on_delivery
-       FROM devices WHERE id = ? AND clerk_id = ?`,
-      [deviceId, clerkId]
+       FROM devices WHERE ${ownership.whereClause}`,
+      ownership.parameters
     );
 
     if (devices.length === 0) {
@@ -65,9 +67,20 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { userId } = await auth();
+    const resolvedParams = await params;
+    const deviceId = resolvedParams.id;
+    const ownership = createDeviceOwnershipScope(deviceId, userId);
+
+    if (!ownership) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
-      clerk_id,
       mail_delivered_notify,
       mailbox_opened_notify,
       mail_removed_notify,
@@ -77,20 +90,11 @@ export async function PUT(
       capture_image_on_open,
       capture_image_on_delivery,
     } = body;
-    const resolvedParams = await params;
-    const deviceId = resolvedParams.id;
-
-    if (!clerk_id) {
-      return NextResponse.json(
-        { error: "clerk_id is required" },
-        { status: 400 }
-      );
-    }
 
     // Verify device ownership
-    const devices = await executeQuery<any[]>(
-      "SELECT * FROM devices WHERE id = ? AND clerk_id = ?",
-      [deviceId, clerk_id]
+    const devices = await executeQuery<DatabaseRows>(
+      `SELECT * FROM devices WHERE ${ownership.whereClause}`,
+      ownership.parameters
     );
 
     if (devices.length === 0) {
@@ -146,22 +150,22 @@ export async function PUT(
 
     // Add updated timestamp and device ID for WHERE clause
     updateFields.push("updated_at = CURRENT_TIMESTAMP");
-    updateValues.push(deviceId);
+    updateValues.push(...ownership.parameters);
 
     await executeQuery(
-      `UPDATE devices SET ${updateFields.join(", ")} WHERE id = ?`,
+      `UPDATE devices SET ${updateFields.join(", ")} WHERE ${ownership.whereClause}`,
       updateValues
     );
 
     // Return updated device settings
-    const updatedDevice = await executeQuery<any[]>(
+    const updatedDevice = await executeQuery<DatabaseRows>(
       `SELECT id, clerk_id, name, location, is_active,
               mail_delivered_notify, mailbox_opened_notify, mail_removed_notify,
               email_notifications, check_interval, battery_threshold,
               capture_image_on_open, capture_image_on_delivery,
               updated_at
-       FROM devices WHERE id = ?`,
-      [deviceId]
+       FROM devices WHERE ${ownership.whereClause}`,
+      ownership.parameters
     );
 
     // Convert database 0/1 values to proper booleans

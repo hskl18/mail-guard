@@ -33,10 +33,12 @@ This directory contains the Next.js API routes for the Mail Guard IoT applicatio
   - Recent images from IoT devices
   - Notification count
 
-### 🔧 Setup APIs
+### 🔧 Documentation API
 
-- **`POST /api/init-db`** - Initialize database with required tables
-- **`GET /api/docs`** - API documentation
+- **`GET /api/docs`** - Runtime API documentation
+
+Database migrations are not available over HTTP.
+Use `pnpm db:migrate -- --dry-run` from the `stack` directory to inspect the offline migration plan.
 
 ## IoT Event Types Supported
 

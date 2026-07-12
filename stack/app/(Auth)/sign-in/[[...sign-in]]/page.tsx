@@ -1,6 +1,4 @@
 import { SignIn } from "@clerk/nextjs";
-import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { Mail, ArrowLeft, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -68,7 +66,7 @@ export default async function SignInPage() {
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/sign-up"
                 className="font-medium text-blue-600 hover:text-blue-500"

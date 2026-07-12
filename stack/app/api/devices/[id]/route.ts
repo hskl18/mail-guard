@@ -1,28 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import { auth } from "@clerk/nextjs/server";
+import { executeQuery, type DatabaseResult } from "@/lib/db";
+import { createDeviceOwnershipScope } from "@/lib/device-ownership.mjs";
 import type { Device } from "@/lib/types";
 
 // GET /api/devices/[id] - Get a specific device
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { searchParams } = new URL(request.url);
-    const clerkId = searchParams.get("clerk_id");
+    const { userId } = await auth();
     const resolvedParams = await params;
     const deviceId = resolvedParams.id;
+    const ownership = createDeviceOwnershipScope(deviceId, userId);
 
-    if (!clerkId) {
+    if (!ownership) {
       return NextResponse.json(
-        { error: "clerk_id parameter is required" },
-        { status: 400 }
+        { error: "Authentication required" },
+        { status: 401 }
       );
     }
 
     const devices = await executeQuery<Device[]>(
-      "SELECT * FROM devices WHERE id = ? AND clerk_id = ?",
-      [deviceId, clerkId]
+      `SELECT * FROM devices WHERE ${ownership.whereClause}`,
+      ownership.parameters
     );
 
     if (devices.length === 0) {
@@ -48,22 +50,25 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const body = await request.json();
-    const { clerk_id, name, serial_number, location, is_active } = body;
+    const { userId } = await auth();
     const resolvedParams = await params;
     const deviceId = resolvedParams.id;
+    const ownership = createDeviceOwnershipScope(deviceId, userId);
 
-    if (!clerk_id) {
+    if (!ownership) {
       return NextResponse.json(
-        { error: "clerk_id is required" },
-        { status: 400 }
+        { error: "Authentication required" },
+        { status: 401 }
       );
     }
 
+    const body = await request.json();
+    const { name, serial_number, location, is_active } = body;
+
     // Verify device ownership
     const devices = await executeQuery<Device[]>(
-      "SELECT * FROM devices WHERE id = ? AND clerk_id = ?",
-      [deviceId, clerk_id]
+      `SELECT * FROM devices WHERE ${ownership.whereClause}`,
+      ownership.parameters
     );
 
     if (devices.length === 0) {
@@ -102,17 +107,17 @@ export async function PUT(
     }
 
     updateFields.push("updated_at = CURRENT_TIMESTAMP");
-    updateValues.push(deviceId);
+    updateValues.push(...ownership.parameters);
 
     await executeQuery(
-      `UPDATE devices SET ${updateFields.join(", ")} WHERE id = ?`,
+      `UPDATE devices SET ${updateFields.join(", ")} WHERE ${ownership.whereClause}`,
       updateValues
     );
 
     // Return updated device
     const updatedDevice = await executeQuery<Device[]>(
-      "SELECT * FROM devices WHERE id = ?",
-      [deviceId]
+      `SELECT * FROM devices WHERE ${ownership.whereClause}`,
+      ownership.parameters
     );
 
     return NextResponse.json({
@@ -130,26 +135,26 @@ export async function PUT(
 
 // DELETE /api/devices/[id] - Delete a specific device
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { searchParams } = new URL(request.url);
-    const clerkId = searchParams.get("clerk_id");
+    const { userId } = await auth();
     const resolvedParams = await params;
     const deviceId = resolvedParams.id;
+    const ownership = createDeviceOwnershipScope(deviceId, userId);
 
-    if (!clerkId) {
+    if (!ownership) {
       return NextResponse.json(
-        { error: "clerk_id parameter is required" },
-        { status: 400 }
+        { error: "Authentication required" },
+        { status: 401 }
       );
     }
 
     // Verify device ownership
     const devices = await executeQuery<Device[]>(
-      "SELECT * FROM devices WHERE id = ? AND clerk_id = ?",
-      [deviceId, clerkId]
+      `SELECT * FROM devices WHERE ${ownership.whereClause}`,
+      ownership.parameters
     );
 
     if (devices.length === 0) {
@@ -163,11 +168,11 @@ export async function DELETE(
     const serialNumber = device.serial_number;
 
     console.log(
-      `Deleting device ${deviceId} with serial ${serialNumber} for user ${clerkId}`
+      `Deleting device ${deviceId} with serial ${serialNumber} for user ${userId}`
     );
 
     // Start comprehensive cleanup process
-    let deletedCounts = {
+    const deletedCounts = {
       events: 0,
       images: 0,
       notifications: 0,
@@ -184,26 +189,26 @@ export async function DELETE(
         "DELETE FROM events WHERE device_id = ?",
         [deviceId]
       );
-      deletedCounts.events = (eventsResult as any).affectedRows || 0;
+      deletedCounts.events = (eventsResult as DatabaseResult).affectedRows || 0;
 
       const imagesResult = await executeQuery(
         "DELETE FROM images WHERE device_id = ?",
         [deviceId]
       );
-      deletedCounts.images = (imagesResult as any).affectedRows || 0;
+      deletedCounts.images = (imagesResult as DatabaseResult).affectedRows || 0;
 
       const notificationsResult = await executeQuery(
         "DELETE FROM notifications WHERE device_id = ?",
         [deviceId]
       );
       deletedCounts.notifications =
-        (notificationsResult as any).affectedRows || 0;
+        (notificationsResult as DatabaseResult).affectedRows || 0;
 
       const healthResult = await executeQuery(
         "DELETE FROM device_health WHERE device_id = ?",
         [deviceId]
       );
-      deletedCounts.health_records = (healthResult as any).affectedRows || 0;
+      deletedCounts.health_records = (healthResult as DatabaseResult).affectedRows || 0;
 
       // 2. Delete IoT-specific data if serial number exists
       if (serialNumber) {
@@ -213,31 +218,34 @@ export async function DELETE(
           "DELETE FROM iot_events WHERE serial_number = ?",
           [serialNumber]
         );
-        deletedCounts.iot_events = (iotEventsResult as any).affectedRows || 0;
+        deletedCounts.iot_events = (iotEventsResult as DatabaseResult).affectedRows || 0;
 
         const iotImagesResult = await executeQuery(
           "DELETE FROM iot_images WHERE serial_number = ?",
           [serialNumber]
         );
-        deletedCounts.iot_images = (iotImagesResult as any).affectedRows || 0;
+        deletedCounts.iot_images = (iotImagesResult as DatabaseResult).affectedRows || 0;
 
         const iotStatusResult = await executeQuery(
           "DELETE FROM iot_device_status WHERE serial_number = ?",
           [serialNumber]
         );
-        deletedCounts.iot_status = (iotStatusResult as any).affectedRows || 0;
+        deletedCounts.iot_status = (iotStatusResult as DatabaseResult).affectedRows || 0;
 
         // 3. Unclaim the device serial (but don't delete the serial record itself)
         const deviceSerialResult = await executeQuery(
           "UPDATE device_serials SET claimed_by_clerk_id = NULL, claimed_at = NULL WHERE serial_number = ? AND claimed_by_clerk_id = ?",
-          [serialNumber, clerkId]
+          [serialNumber, userId]
         );
         deletedCounts.device_serial =
-          (deviceSerialResult as any).affectedRows || 0;
+          (deviceSerialResult as DatabaseResult).affectedRows || 0;
       }
 
       // 4. Finally delete the device record
-      await executeQuery("DELETE FROM devices WHERE id = ?", [deviceId]);
+      await executeQuery(
+        `DELETE FROM devices WHERE ${ownership.whereClause}`,
+        ownership.parameters
+      );
 
       console.log("Device deletion completed:", deletedCounts);
 

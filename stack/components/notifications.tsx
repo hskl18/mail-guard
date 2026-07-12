@@ -15,14 +15,11 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -37,6 +34,52 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import NextImage from "next/image";
+
+interface NotificationDevice {
+  id: number;
+  name?: string;
+  serial_number?: string;
+  location?: string;
+}
+
+interface DashboardEvent {
+  id: number | string;
+  device_id?: number | string;
+  device_name?: string;
+  device_location?: string;
+  serial_number?: string;
+  event_type: string;
+  occurred_at: string;
+}
+
+interface CapturedImage {
+  id: number | string;
+  device_id?: number | string;
+  serial_number?: string;
+  captured_at: string;
+  source?: "iot";
+}
+
+interface ActivityNotification {
+  id: number | string;
+  device_id?: number | string;
+  deviceName: string;
+  deviceLocation?: string;
+  type: string;
+  notification_type: string;
+  time: string;
+  sent_at: string;
+  message: string;
+  read: boolean;
+  hasImage: boolean;
+}
+
+interface DashboardResponse {
+  devices?: NotificationDevice[];
+  recent_events?: DashboardEvent[];
+  recent_images?: CapturedImage[];
+}
 
 export default function Notifications() {
   const { user } = useUser();
@@ -44,12 +87,12 @@ export default function Notifications() {
   const [filter, setFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [devices, setDevices] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [images, setImages] = useState<any[]>([]);
+  const [devices, setDevices] = useState<NotificationDevice[]>([]);
+  const [notifications, setNotifications] = useState<ActivityNotification[]>([]);
+  const [images, setImages] = useState<CapturedImage[]>([]);
 
   // Function to find image for a notification (similar to dashboard)
-  const findImageForNotification = (notification: any) => {
+  const findImageForNotification = (notification: ActivityNotification) => {
     if (!images.length) return null;
 
     const notificationTime = new Date(notification.sent_at);
@@ -132,7 +175,7 @@ export default function Notifications() {
           );
         }
 
-        const dashboardData = await dashboardRes.json();
+        const dashboardData = (await dashboardRes.json()) as DashboardResponse;
         console.log("Dashboard data:", dashboardData);
         console.log("Events count:", dashboardData.recent_events?.length || 0);
         console.log("Images count:", dashboardData.recent_images?.length || 0);
@@ -155,10 +198,10 @@ export default function Notifications() {
         setImages(imagesData);
 
         // Convert events to notification format
-        const allNotifications: any[] = [];
+        const allNotifications: ActivityNotification[] = [];
 
         // Process events to match the notification format
-        eventsData.forEach((event: any) => {
+        eventsData.forEach((event) => {
           // Handle both regular events and IoT events
           let device = null;
           let deviceName = "Unknown Device";
@@ -166,7 +209,7 @@ export default function Notifications() {
 
           if (event.device_id && typeof event.device_id === "number") {
             // Regular dashboard event - find matching device
-            device = devicesData.find((d: any) => d.id === event.device_id);
+            device = devicesData.find((d) => d.id === event.device_id);
             if (device) {
               deviceName =
                 device.name || device.serial_number || "Unknown Device";
@@ -179,10 +222,11 @@ export default function Notifications() {
           } else if (event.serial_number) {
             // IoT event with serial - try to find matching device
             device = devicesData.find(
-              (d: any) => d.serial_number === event.serial_number
+              (d) => d.serial_number === event.serial_number
             );
             if (device) {
-              deviceName = device.name || device.serial_number;
+              deviceName =
+                device.name || device.serial_number || "Unknown Device";
               deviceLocation = device.location || "";
             } else {
               deviceName = `IoT Device (${event.serial_number})`;
@@ -217,9 +261,10 @@ export default function Notifications() {
         setNotifications(allNotifications);
         console.log("Processed notifications:", allNotifications.length);
         console.log("Sample notifications:", allNotifications.slice(0, 3));
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to load notifications:", err);
-        setError(`Error loading notifications: ${err.message}`);
+        const message = err instanceof Error ? err.message : "Unknown error";
+        setError(`Error loading notifications: ${message}`);
 
         // Use mock data in development for easier UI testing
         if (process.env.NODE_ENV === "development") {
@@ -287,7 +332,7 @@ export default function Notifications() {
           (n) => n.type === filter || n.notification_type === filter
         );
 
-  const openImageDialog = (notification: any) => {
+  const openImageDialog = (notification: ActivityNotification) => {
     const image = findImageForNotification(notification);
     if (image) {
       // Use the image proxy endpoint instead of direct S3 URL
@@ -406,7 +451,7 @@ export default function Notifications() {
               <Bell className="h-8 w-8 text-gray-400 mx-auto mb-2" />
               <h3 className="font-medium">No notifications</h3>
               <p className="text-sm text-gray-500">
-                When events occur, you'll see them here
+                When events occur, you&apos;ll see them here
               </p>
             </div>
           )}
@@ -435,9 +480,12 @@ export default function Notifications() {
           </DialogHeader>
           {selectedImage && (
             <div className="flex justify-center">
-              <img
+              <NextImage
                 src={selectedImage}
                 alt="Captured mailbox image"
+                width={960}
+                height={640}
+                unoptimized
                 className="max-h-[60vh] object-contain rounded-md"
               />
             </div>

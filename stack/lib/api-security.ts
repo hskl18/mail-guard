@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import type { DatabaseRows } from "./db";
+import {
+  generateInternalApiKey as createInternalApiKey,
+  verifyInternalApiKey as verifySignedInternalApiKey,
+} from "./internal-api-key.mjs";
 
 // Rate limiting store (in production, use Redis)
 const rateLimit = new Map<string, { count: number; resetTime: number }>();
@@ -282,7 +287,7 @@ async function verifyApiKeyInDatabase(
   try {
     const { executeQuery } = await import("./db");
 
-    const results = await executeQuery<any[]>(
+    const results = await executeQuery<DatabaseRows>(
       `SELECT id, type, device_serial, permissions, created_at, last_used, is_active 
        FROM api_keys 
        WHERE key_hash = ? AND type = ? AND is_active = 1`,
@@ -322,31 +327,34 @@ async function updateApiKeyLastUsed(hashedKey: string): Promise<void> {
 }
 
 // Validate request payload
-export function validateIoTEventPayload(body: any): {
+export function validateIoTEventPayload(body: unknown): {
   valid: boolean;
   errors: string[];
 } {
   const errors: string[] = [];
 
-  if (!body) {
+  if (!body || typeof body !== "object") {
     errors.push("Request body is required");
     return { valid: false, errors };
   }
 
-  if (!body.serial_number || typeof body.serial_number !== "string") {
+  const payload = body as Record<string, unknown>;
+
+  if (!payload.serial_number || typeof payload.serial_number !== "string") {
     errors.push("serial_number is required and must be a string");
   }
 
-  if (!body.event_data || typeof body.event_data !== "object") {
+  if (!payload.event_data || typeof payload.event_data !== "object") {
     errors.push("event_data is required and must be an object");
   } else {
-    if (body.event_data.reed_sensor === undefined) {
+    const eventData = payload.event_data as Record<string, unknown>;
+    if (eventData.reed_sensor === undefined) {
       errors.push("event_data.reed_sensor is required");
     }
   }
 
   // Optional timestamp validation
-  if (body.timestamp && typeof body.timestamp !== "string") {
+  if (payload.timestamp && typeof payload.timestamp !== "string") {
     errors.push("timestamp must be a string if provided");
   }
 
@@ -392,7 +400,7 @@ export function createSecurityResponse(
 // Log security events
 export function logSecurityEvent(
   event: string,
-  details: any,
+  details: unknown,
   request: NextRequest
 ): void {
   const logEntry = {
@@ -412,69 +420,15 @@ export function logSecurityEvent(
   console.warn("SECURITY EVENT:", JSON.stringify(logEntry, null, 2));
 }
 
-// Environment variable validation
-export function validateSecurityEnvironment(): {
-  valid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-
-  const requiredEnvVars = [
-    "IOT_API_SECRET_KEY",
-    "ADMIN_API_SECRET_KEY",
-    "API_ENCRYPTION_SECRET",
-  ];
-
-  requiredEnvVars.forEach((envVar) => {
-    if (!process.env[envVar]) {
-      errors.push(`Missing required environment variable: ${envVar}`);
-    }
-  });
-
-  return { valid: errors.length === 0, errors };
-}
-
 // Generate internal API key for server-to-server communication
 export function generateInternalApiKey(): string {
-  const secret =
-    process.env.API_ENCRYPTION_SECRET || "default-secret-change-me";
-  const timestamp = Date.now().toString();
-  const randomBytes = crypto.randomBytes(32).toString("hex");
-
-  const payload = `${timestamp}:${randomBytes}`;
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update(payload)
-    .digest("hex");
-
-  return `int_${Buffer.from(`${payload}:${signature}`).toString("base64")}`;
+  return createInternalApiKey(process.env.API_ENCRYPTION_SECRET);
 }
 
 // Verify internal API key
 export function verifyInternalApiKey(apiKey: string): boolean {
-  try {
-    if (!apiKey.startsWith("int_")) return false;
-
-    const secret =
-      process.env.API_ENCRYPTION_SECRET || "default-secret-change-me";
-    const payload = Buffer.from(apiKey.substring(4), "base64").toString();
-    const [timestamp, randomBytes, signature] = payload.split(":");
-
-    if (!timestamp || !randomBytes || !signature) return false;
-
-    const expectedSignature = crypto
-      .createHmac("sha256", secret)
-      .update(`${timestamp}:${randomBytes}`)
-      .digest("hex");
-
-    if (signature !== expectedSignature) return false;
-
-    // Check if key is not too old (24 hours)
-    const keyAge = Date.now() - parseInt(timestamp);
-    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-
-    return keyAge < maxAge;
-  } catch (error) {
-    return false;
-  }
+  return verifySignedInternalApiKey(
+    apiKey,
+    process.env.API_ENCRYPTION_SECRET
+  );
 }

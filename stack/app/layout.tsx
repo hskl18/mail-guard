@@ -1,8 +1,6 @@
 import type React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Inter } from "next/font/google";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });

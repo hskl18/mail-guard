@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import { executeQuery, type DatabaseRows } from "@/lib/db";
 import {
   authenticateIoTDevice,
   createSecurityResponse,
   logSecurityEvent,
-  checkRateLimit,
-  hashApiKey,
 } from "@/lib/api-security";
 
 // POST /api/iot/activate - IoT device checking if serial number is valid (SECURED)
@@ -52,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if serial number exists in valid serials table, if not create it automatically
-    let validSerial = await executeQuery<any[]>(
+    let validSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM device_serials WHERE serial_number = ?",
       [serial_number]
     );
@@ -71,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
 
       // Fetch the newly created record
-      validSerial = await executeQuery<any[]>(
+      validSerial = await executeQuery<DatabaseRows>(
         "SELECT * FROM device_serials WHERE serial_number = ?",
         [serial_number]
       );
@@ -107,40 +105,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update or create device status record
-    const existingStatus = await executeQuery<any[]>(
-      "SELECT * FROM iot_device_status WHERE serial_number = ?",
-      [serial_number]
+    // The unique serial constraint makes activation safe under concurrent requests.
+    await executeQuery(
+      `INSERT INTO iot_device_status
+       (serial_number, firmware_version, device_type, is_online, last_seen)
+       VALUES (?, ?, ?, 1, NOW())
+       ON DUPLICATE KEY UPDATE
+         last_seen = NOW(),
+         firmware_version = COALESCE(?, firmware_version),
+         is_online = 1,
+         device_type = COALESCE(?, device_type)`,
+      [
+        serial_number,
+        firmware_version || "1.0.0",
+        device_type || "mailbox_monitor",
+        firmware_version || null,
+        device_type || null,
+      ]
     );
-
-    if (existingStatus.length > 0) {
-      // Update existing status
-      await executeQuery(
-        `UPDATE iot_device_status 
-         SET last_seen = NOW(), 
-             firmware_version = ?,
-             is_online = 1, 
-             device_type = ?
-         WHERE serial_number = ?`,
-        [
-          firmware_version || existingStatus[0].firmware_version,
-          device_type || existingStatus[0].device_type,
-          serial_number,
-        ]
-      );
-    } else {
-      // Create new status record
-      await executeQuery(
-        `INSERT INTO iot_device_status 
-         (serial_number, firmware_version, device_type, is_online, last_seen) 
-         VALUES (?, ?, ?, 1, NOW())`,
-        [
-          serial_number,
-          firmware_version || "1.0.0",
-          device_type || "mailbox_monitor",
-        ]
-      );
-    }
 
     logSecurityEvent(
       "IOT_DEVICE_ACTIVATED",
@@ -231,7 +213,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get device info from serials table, create if doesn't exist
-    let deviceSerial = await executeQuery<any[]>(
+    let deviceSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM device_serials WHERE serial_number = ?",
       [serialNumber]
     );
@@ -249,7 +231,7 @@ export async function GET(request: NextRequest) {
       );
 
       // Fetch the newly created record
-      deviceSerial = await executeQuery<any[]>(
+      deviceSerial = await executeQuery<DatabaseRows>(
         "SELECT * FROM device_serials WHERE serial_number = ?",
         [serialNumber]
       );
@@ -264,7 +246,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get current device status
-    const deviceStatus = await executeQuery<any[]>(
+    const deviceStatus = await executeQuery<DatabaseRows>(
       "SELECT * FROM iot_device_status WHERE serial_number = ?",
       [serialNumber]
     );
@@ -273,7 +255,7 @@ export async function GET(request: NextRequest) {
     const statusInfo = deviceStatus.length > 0 ? deviceStatus[0] : null;
 
     // Check if device is linked to dashboard (exists in devices table)
-    const dashboardDevice = await executeQuery<any[]>(
+    const dashboardDevice = await executeQuery<DatabaseRows>(
       "SELECT id, clerk_id, name FROM devices WHERE serial_number = ?",
       [serialNumber]
     );

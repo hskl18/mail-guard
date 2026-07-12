@@ -1,23 +1,23 @@
-# MailGuard – Smart IoT Cluster Mailbox Security System
+# MailGuard - Smart IoT Cluster Mailbox Security System
 
-[![Security Status](https://img.shields.io/badge/Security-Enterprise%20Grade-green.svg)](https://github.com/hskl18/mail-guard)
-[![API Documentation](https://img.shields.io/badge/API-Documented-blue.svg)](https://mail-guard-ten.vercel.app/api/docs)
-[![Live Demo](https://img.shields.io/badge/Demo-Live-brightgreen.svg)](https://mail-guard-ten.vercel.app/)
+[![Project Status](https://img.shields.io/badge/Status-Prototype-yellow.svg)](https://github.com/hskl18/mail-guard)
+[![CI](https://github.com/hskl18/mail-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/hskl18/mail-guard/actions/workflows/ci.yml)
 
-Welcome to **MailGuard**, an enterprise-grade IoT cluster mailbox monitoring system designed to secure package deliveries and prevent mail theft in residential communities. This comprehensive security platform provides real-time monitoring, photo evidence capture, and instant notifications through a modern web dashboard.
+MailGuard is an IoT mailbox monitoring prototype for exploring delivery events, photo evidence, notifications, and a web dashboard.
+The repository demonstrates an end-to-end architecture, but production deployment still requires hosted integration, security, reliability, and hardware validation.
 
 ---
 
 ## 🌟 System Overview
 
-MailGuard is a **complete IoT security ecosystem** that transforms standard cluster mailboxes into smart, monitored security systems:
+MailGuard combines experimental hardware, API, storage, notification, and dashboard components:
 
-📦 **Real-Time Event Monitoring** - Track every mailbox access, delivery, and removal  
-📸 **Automated Photo Capture** - Visual evidence for every security event  
-🔔 **Instant Multi-Channel Notifications** - Email alerts and dashboard updates  
-🛡️ **Enterprise Security** - API key authentication, rate limiting, and audit logging  
-🌐 **Cloud-Native Architecture** - Scalable Next.js fullstack application  
-📊 **Comprehensive Analytics** - Dashboard with device health and event history
+- **Event monitoring** - Model mailbox access, delivery, and removal events.
+- **Photo capture** - Associate image evidence with device events.
+- **Notifications** - Exercise email alerts and dashboard updates.
+- **Security controls** - Explore API keys, user sessions, ownership checks, rate limiting, and audit events.
+- **Full-stack architecture** - Connect a Next.js application to MySQL, S3, Clerk, and Resend.
+- **Dashboard** - Display device health and event history.
 
 ---
 
@@ -46,7 +46,7 @@ MailGuard is a **complete IoT security ecosystem** that transforms standard clus
 - **Application Layer**: Next.js 15 with App Router and TypeScript
 - **Data Layer**: MySQL database with audit logging
 - **Storage Layer**: AWS S3 for secure image storage
-- **Communication Layer**: Real-time notifications via MailerSend
+- **Communication Layer**: Email notifications via Resend
 
 ---
 
@@ -62,7 +62,7 @@ mail-guard/
 │   │   │   ├── dashboard/    # Dashboard data (user auth)
 │   │   │   ├── community-reports/ # Community features
 │   │   │   ├── image/        # Secure image proxy
-│   │   │   └── init-db/      # Database setup (admin auth)
+│   │   │   └── docs/         # Runtime API documentation
 │   │   ├── dashboard/        # User dashboard pages
 │   │   ├── connect-device/   # Device onboarding
 │   │   └── (Auth)/           # Authentication pages
@@ -73,7 +73,7 @@ mail-guard/
 │   │   ├── notifications.tsx # Notification center
 │   │   └── committee.tsx     # Community management
 │   ├── lib/                  # Core utilities and services
-│   │   ├── api-security.ts   # Enterprise security system
+│   │   ├── api-security.ts   # Authentication and rate-limit helpers
 │   │   ├── db.ts             # Database connection & queries
 │   │   ├── email.ts          # Email notification service
 │   │   ├── s3.ts             # AWS S3 integration
@@ -96,19 +96,18 @@ mail-guard/
 
 ## 🛡️ Security Features
 
-### **Enterprise-Grade API Security**
+### **Security Foundations**
 
 - **Multi-Tier Authentication**:
 
   - IoT devices: API key authentication with device serial verification
   - Users: Clerk-based authentication with session management
-  - Admins: High-security API keys for system administration
+  - Operators: Offline, explicitly confirmed database migrations
 
 - **Rate Limiting**:
 
   - IoT devices: 100 requests/hour per device
   - Users: 1000 requests/hour per user
-  - Admins: 10000 requests/hour per admin
 
 - **Data Protection**:
 
@@ -116,8 +115,8 @@ mail-guard/
   - Device ownership verification for all operations
   - Secure image proxy with authorization checks
 
-- **Audit & Monitoring**:
-  - Comprehensive security event logging
+- **Audit Foundations**:
+  - Structured security event logging helpers
   - Authentication attempt tracking
   - Unauthorized access detection and alerting
 
@@ -138,11 +137,11 @@ if (!authResult.success) {
 
 ### **Prerequisites**
 
-- Node.js 18+ and pnpm
+- Node.js 22 and pnpm 11
 - MySQL database (Aiven recommended)
 - AWS S3 bucket for image storage
 - Clerk account for authentication
-- MailerSend account for notifications
+- Resend account for notifications
 
 ### **Environment Setup**
 
@@ -173,14 +172,17 @@ AWS_REGION=us-east-1
 S3_BUCKET=your-mailguard-bucket
 
 # Notifications
-RESEND_API_KEY=mlsn...
+RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@yourdomain.com
 RESEND_FROM_NAME="Mail Guard Security"
 
 # Security
-IOT_API_SECRET_KEY=your-iot-secret
-ADMIN_API_SECRET_KEY=your-admin-secret
 API_ENCRYPTION_SECRET=your-encryption-secret
+COMMITTEE_REVIEWER_IDS=user_example
+
+# Offline migration controls
+DATABASE_MIGRATION_CONFIRM=
+DATABASE_MIGRATION_TARGET=
 
 # Application
 NEXT_PUBLIC_APP_URL=https://your-domain.com
@@ -196,9 +198,11 @@ cd mail-guard/stack
 # Install dependencies
 pnpm install
 
-# Initialize database (requires admin API key)
-curl -X POST http://localhost:3000/api/init-db \
-  -H "Authorization: Bearer admin_your_admin_api_key"
+# Preview the idempotent schema migration without a database connection
+pnpm db:migrate -- --dry-run
+
+# Apply only from an operator shell after reviewing the dry run
+DATABASE_MIGRATION_CONFIRM=apply DATABASE_MIGRATION_TARGET=host/database pnpm db:migrate -- --apply
 
 # Start development server
 pnpm dev
@@ -259,10 +263,10 @@ pnpm start
 
 ## 🔧 API Documentation
 
-### **Live API Documentation**
+### **API Documentation**
 
-- **Swagger UI**: [https://mail-guard-ten.vercel.app/api/docs](https://mail-guard-ten.vercel.app/api/docs)
-- **Interactive Testing**: Full API testing interface with authentication
+- **Local Swagger UI**: `/api/docs`
+- **Scope**: Prototype endpoint contracts and authentication examples
 
 ### **Key Endpoints**
 
@@ -292,11 +296,8 @@ POST /api/community-reports # Submit safety report
 PATCH /api/community-reports # Update report status
 ```
 
-#### **Admin Endpoints** (Admin API Key Required)
-
-```
-POST /api/init-db           # Initialize database
-```
+Database migrations are intentionally unavailable over HTTP.
+Operators run the offline migration CLI from a trusted shell.
 
 ---
 
@@ -341,23 +342,23 @@ python test_iot_data.py
 
 ---
 
-## 🌐 Live Demo
+## 🌐 Hosted Prototype
 
-- **Production Dashboard**: [https://mail-guard-ten.vercel.app/](https://mail-guard-ten.vercel.app/)
+- **Hosted Dashboard**: [https://mail-guard-ten.vercel.app/](https://mail-guard-ten.vercel.app/)
 - **API Documentation**: [https://mail-guard-ten.vercel.app/api/docs](https://mail-guard-ten.vercel.app/api/docs)
 
 ### **Demo Features**
 
 - Guest user registration
 - Sample device simulation
-- Live API testing interface
+- API documentation interface
 - Security feature demonstration
 
 ---
 
-## 🎯 Target Market
+## 🎯 Potential Use Cases
 
-### **Primary Markets**
+### **Example Environments**
 
 1. **Residential Communities & HOAs** - Cluster mailbox security for neighborhoods and apartment complexes
 2. **Property Management Companies** - Reduce liability and improve resident satisfaction
@@ -375,15 +376,18 @@ python test_iot_data.py
 
 ## 📈 Current Status
 
-### **✅ Production Ready Features**
+### **Implemented Prototype Features**
 
-- Complete security implementation
+- API authentication and rate-limiting foundations
 - User authentication and authorization
 - Device management and monitoring
 - Photo capture and storage
 - Email notification system
 - Community reporting features
-- Comprehensive API documentation
+- Runtime API documentation
+
+These features have not been validated as a complete production system.
+Open production gates include hosted dependency configuration, migration execution, monitoring, hardware testing, incident response, and security review.
 
 ### **🔧 In Development**
 
@@ -392,31 +396,6 @@ python test_iot_data.py
 - Machine learning for delivery patterns
 - Integration with delivery services
 - Solar charging optimization
-
----
-
-## 🔮 Future Roadmap
-
-### **Phase 1: Enhanced Analytics** (Q1 2024)
-
-- Delivery pattern analysis
-- Security incident trending
-- Community safety metrics
-- Advanced reporting dashboards
-
-### **Phase 2: Mobile & Integrations** (Q2 2024)
-
-- Native iOS/Android applications
-- Delivery service integrations (FedEx, UPS, USPS)
-- Smart doorbell compatibility
-- Voice assistant integration
-
-### **Phase 3: AI & Automation** (Q3 2024)
-
-- Computer vision for package detection
-- Predictive analytics for theft prevention
-- Automated incident response
-- Advanced security pattern recognition
 
 ---
 

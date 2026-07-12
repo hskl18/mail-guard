@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeQuery } from "@/lib/db";
-import { DashboardData } from "@/lib/types";
+import {
+  DashboardData,
+  Device,
+  DashboardEvent,
+  DashboardImage,
+} from "@/lib/types";
 import { auth } from "@clerk/nextjs/server";
 import {
   createSecurityResponse,
   logSecurityEvent,
   checkRateLimit,
 } from "@/lib/api-security";
+
+type DashboardDevice = Device & {
+  is_online?: boolean | number;
+  iot_last_seen?: string;
+  firmware_version?: string;
+  battery_level?: number;
+  signal_strength?: number;
+};
 
 // GET /api/dashboard - Get dashboard data for a user (SECURED)
 export async function GET(request: NextRequest) {
@@ -65,7 +78,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all devices for the user with IoT status
-    const devicesRaw = await executeQuery<any[]>(
+    const devicesRaw = await executeQuery<DashboardDevice[]>(
       `SELECT d.*, 
               ios.is_online, 
               ios.last_seen as iot_last_seen,
@@ -96,11 +109,11 @@ export async function GET(request: NextRequest) {
     const deviceIds = devices.map((device) => device.id);
 
     // Get recent events from registered dashboard devices
-    let recentEvents: any[] = [];
+    let recentEvents: DashboardEvent[] = [];
     if (deviceIds.length > 0) {
       // Fix: Use proper array handling for IN clause
       const placeholders = deviceIds.map(() => "?").join(",");
-      recentEvents = await executeQuery<any[]>(
+      recentEvents = await executeQuery<DashboardEvent[]>(
         `SELECT e.*, d.name as device_name, d.location as device_location
          FROM events e
          JOIN devices d ON e.device_id = d.id
@@ -112,7 +125,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ALSO get IoT events from devices that match claimed serials by this user
-    const userSerials = await executeQuery<any[]>(
+    const userSerials = await executeQuery<Array<{ serial_number: string }>>(
       `SELECT DISTINCT serial_number FROM device_serials 
        WHERE claimed_by_clerk_id = ? OR 
              serial_number IN (SELECT serial_number FROM devices WHERE clerk_id = ?)`,
@@ -124,7 +137,7 @@ export async function GET(request: NextRequest) {
       const serialNumbers = userSerials.map((s) => s.serial_number);
 
       const serialPlaceholders = serialNumbers.map(() => "?").join(",");
-      const iotEvents = await executeQuery<any[]>(
+      const iotEvents = await executeQuery<DashboardEvent[]>(
         `SELECT ie.*, 
                 ds.device_model,
                 'IoT Device' as device_name,
@@ -138,7 +151,7 @@ export async function GET(request: NextRequest) {
       );
 
       // Transform IoT events to match dashboard events format
-      const transformedIotEvents = iotEvents.map((event) => ({
+      const transformedIotEvents: DashboardEvent[] = iotEvents.map((event) => ({
         id: `iot_${event.id}`,
         device_id: `iot_${event.serial_number}`,
         event_type: event.event_type,
@@ -160,10 +173,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get recent images from registered dashboard devices
-    let recentImages: any[] = [];
+    let recentImages: DashboardImage[] = [];
     if (deviceIds.length > 0) {
       const placeholders = deviceIds.map(() => "?").join(",");
-      recentImages = await executeQuery<any[]>(
+      recentImages = await executeQuery<DashboardImage[]>(
         `SELECT i.*, d.name as device_name 
          FROM images i
          JOIN devices d ON i.device_id = d.id
@@ -179,7 +192,7 @@ export async function GET(request: NextRequest) {
       const serialNumbers = userSerials.map((s) => s.serial_number);
       const serialPlaceholders = serialNumbers.map(() => "?").join(",");
 
-      const iotImages = await executeQuery<any[]>(
+      const iotImages = await executeQuery<DashboardImage[]>(
         `SELECT ii.*, 
                 'IoT Device' as device_name
          FROM iot_images ii
@@ -190,7 +203,7 @@ export async function GET(request: NextRequest) {
       );
 
       // Transform IoT images to match dashboard images format
-      const transformedIotImages = iotImages.map((image) => ({
+      const transformedIotImages: DashboardImage[] = iotImages.map((image) => ({
         id: `iot_${image.id}`,
         device_id: `iot_${image.serial_number}`,
         image_url: image.image_url,
@@ -212,7 +225,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get notification count
-    const notificationResult = await executeQuery<any[]>(
+    const notificationResult = await executeQuery<Array<{ count: number }>>(
       `SELECT COUNT(*) as count FROM notifications n
        JOIN devices d ON n.device_id = d.id
        WHERE d.clerk_id=?`,

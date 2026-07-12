@@ -1,8 +1,5 @@
 import { Resend } from "resend";
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY || "");
-
 export interface EmailNotificationParams {
   to: string;
   deviceName?: string;
@@ -30,6 +27,8 @@ export async function sendEventNotification({
       console.error("Missing required Resend API key");
       return false;
     }
+
+    const resend = new Resend(apiKey);
 
     // Create subject and content based on event type
     const subject = getEmailSubject(eventType);
@@ -88,6 +87,9 @@ function getEmailContent(
 ): { htmlContent: string; textContent: string } {
   const eventMessage = getEventMessage(eventType);
   const formattedTime = new Date(timestamp).toLocaleString();
+  const safeDeviceName = escapeHtml(deviceName);
+  const safeEventMessage = escapeHtml(eventMessage);
+  const safeFormattedTime = escapeHtml(formattedTime);
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -107,9 +109,9 @@ function getEmailContent(
         <h2 style="color: #2d3748; margin-top: 0; font-size: 20px;">Mailbox Event Detected</h2>
         
         <div style="background: #f7fafc; border-left: 4px solid #4299e1; padding: 20px; margin: 20px 0; border-radius: 5px;">
-          <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Device:</strong> ${deviceName}</p>
-          <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Event:</strong> ${eventMessage}</p>
-          <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Time:</strong> ${formattedTime}</p>
+          <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Device:</strong> ${safeDeviceName}</p>
+          <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Event:</strong> ${safeEventMessage}</p>
+          <p style="margin: 0 0 10px 0; font-size: 16px;"><strong>Time:</strong> ${safeFormattedTime}</p>
         </div>
         
         ${
@@ -193,6 +195,22 @@ function getEventMessage(eventType: string): string {
   }
 }
 
-export default {
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[character] ?? character
+  );
+}
+
+const emailService = {
   sendEventNotification,
 };
+
+export default emailService;

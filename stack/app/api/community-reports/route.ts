@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import {
+  executeQuery,
+  type DatabaseRows,
+  type DatabaseResult,
+  type QueryParameters,
+} from "@/lib/db";
 import { auth } from "@clerk/nextjs/server";
 import {
   createSecurityResponse,
   logSecurityEvent,
   checkRateLimit,
 } from "@/lib/api-security";
+import { isCommitteeReviewer } from "@/lib/committee-authorization.mjs";
 
 // POST /api/community-reports - Submit a community safety report (SECURED)
 export async function POST(request: NextRequest) {
@@ -119,10 +125,10 @@ export async function POST(request: NextRequest) {
       [userId, zip_code, description || null, image_url || null]
     );
 
-    const reportId = (result as any).insertId;
+    const reportId = (result as DatabaseResult).insertId;
 
     // Get the created report with formatted data
-    const createdReport = await executeQuery<any[]>(
+    const createdReport = await executeQuery<DatabaseRows>(
       `SELECT 
          id,
          clerk_id,
@@ -216,6 +222,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const zipCode = searchParams.get("zip_code");
     const status = searchParams.get("status");
+    const canReviewCommunityReports = isCommitteeReviewer(
+      userId,
+      process.env.COMMITTEE_REVIEWER_IDS
+    );
     const limit = Math.max(
       1,
       Math.min(100, parseInt(searchParams.get("limit") || "20"))
@@ -268,16 +278,17 @@ export async function GET(request: NextRequest) {
       WHERE 1=1
     `;
 
-    const params: any[] = [];
+    const params: QueryParameters = [];
+
+    if (!canReviewCommunityReports) {
+      query += ` AND cr.clerk_id = ?`;
+      params.push(userId);
+    }
 
     // If zip code is provided, filter by zip code
     if (zipCode) {
       query += ` AND cr.zip_code = ?`;
       params.push(zipCode);
-    } else {
-      // If no zip code provided, show all reports (committee can see all reports)
-      // In a real application, you might want to restrict this based on user role
-      // For now, showing all reports so committee members can see community submissions
     }
 
     // Filter by status if provided
@@ -289,9 +300,22 @@ export async function GET(request: NextRequest) {
     // Use string interpolation for LIMIT to avoid parameter binding issues
     query += ` ORDER BY cr.submitted_at DESC LIMIT ${limit}`;
 
-    const reports = await executeQuery<any[]>(query, params);
+    const reports = await executeQuery<DatabaseRows>(query, params);
 
     // Get summary statistics
+    const statsConditions: string[] = [];
+    const statsParams: QueryParameters = [];
+
+    if (!canReviewCommunityReports) {
+      statsConditions.push("clerk_id = ?");
+      statsParams.push(userId);
+    }
+
+    if (zipCode) {
+      statsConditions.push("zip_code = ?");
+      statsParams.push(zipCode);
+    }
+
     const statsQuery = `
       SELECT 
         COUNT(*) as total_reports,
@@ -299,11 +323,10 @@ export async function GET(request: NextRequest) {
         SUM(CASE WHEN status = 'reviewed' THEN 1 ELSE 0 END) as reviewed_count,
         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count
       FROM community_reports
-      ${zipCode ? "WHERE zip_code = ?" : ""}
+      ${statsConditions.length > 0 ? `WHERE ${statsConditions.join(" AND ")}` : ""}
     `;
 
-    const statsParams = zipCode ? [zipCode] : [];
-    const stats = await executeQuery<any[]>(statsQuery, statsParams);
+    const stats = await executeQuery<DatabaseRows>(statsQuery, statsParams);
 
     logSecurityEvent(
       "COMMUNITY_REPORTS_RETRIEVED",
@@ -362,6 +385,17 @@ export async function PATCH(request: NextRequest) {
       );
 
       return createSecurityResponse("Authentication required", 401);
+    }
+
+    if (
+      !isCommitteeReviewer(userId, process.env.COMMITTEE_REVIEWER_IDS)
+    ) {
+      logSecurityEvent(
+        "COMMUNITY_REPORT_UPDATE_FORBIDDEN",
+        { userId },
+        request
+      );
+      return createSecurityResponse("Committee access required", 403);
     }
 
     // SECURITY: Rate limiting
@@ -465,7 +499,7 @@ export async function PATCH(request: NextRequest) {
     await executeQuery(updateQuery, updateValues);
 
     // Get the updated report
-    const updatedReport = await executeQuery<any[]>(
+    const updatedReport = await executeQuery<DatabaseRows>(
       `SELECT 
          id,
          clerk_id,

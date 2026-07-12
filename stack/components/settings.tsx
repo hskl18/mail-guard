@@ -1,20 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import {
   Bell,
   Wifi,
-  Shield,
   Save,
   Mail,
   AlertTriangle,
   UserIcon,
   Settings as SettingsIcon,
-  Camera,
-  Clock,
   CheckCircle2,
-  Smartphone,
   Monitor,
 } from "lucide-react";
 import {
@@ -32,15 +28,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import type { Device } from "@/lib/types";
+import Image from "next/image";
 
 export default function Settings() {
   const { user } = useUser();
@@ -48,8 +39,8 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [devices, setDevices] = useState<any[]>([]);
-  const [currentDevice, setCurrentDevice] = useState<any>(null);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [currentDevice, setCurrentDevice] = useState<Device | null>(null);
 
   // Notification settings with defaults that will be overridden by API data
   const [notificationSettings, setNotificationSettings] = useState({
@@ -69,7 +60,7 @@ export default function Settings() {
   });
 
   // Function to load settings data
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     if (!user?.id) return;
 
     setIsLoading(true);
@@ -147,18 +138,19 @@ export default function Settings() {
           await loadDeviceSettings(device.id, user.id);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load settings:", err);
-      setError(`Error loading settings: ${err.message}`);
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(`Error loading settings: ${message}`);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id]);
 
   // Load devices and settings on component mount
   useEffect(() => {
-    loadSettings();
-  }, [user]);
+    void loadSettings();
+  }, [loadSettings]);
 
   // Add a focus event listener to refresh data when the settings tab becomes visible
   useEffect(() => {
@@ -223,7 +215,7 @@ export default function Settings() {
           settingsData.capture_image_on_delivery ?? true
         ),
       }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to load device settings:", err);
       // Don't set global error, just log
     }
@@ -307,10 +299,11 @@ export default function Settings() {
       toast.success("Settings saved successfully", {
         description: "Your preferences have been updated.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to save settings:", err);
       toast.error("Failed to save settings", {
-        description: err.message || "Please try again later.",
+        description:
+          err instanceof Error ? err.message : "Please try again later.",
       });
     } finally {
       setSaving(false);
@@ -548,7 +541,7 @@ export default function Settings() {
                             Enable email notifications
                           </Label>
                           <p className="text-sm text-gray-600">
-                            Receive email alerts for the events you've selected
+                            Receive email alerts for the events you&apos;ve selected
                             above
                           </p>
                         </div>
@@ -566,7 +559,7 @@ export default function Settings() {
                       <Alert className="mt-4 border-green-200 bg-green-50">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-700">
-                          Email notifications are enabled. You'll receive emails
+                          Email notifications are enabled. You&apos;ll receive emails
                           at{" "}
                           <strong>
                             {user?.primaryEmailAddress?.emailAddress}
@@ -580,7 +573,7 @@ export default function Settings() {
                       <Alert className="mt-4 border-amber-200 bg-amber-50">
                         <AlertTriangle className="h-4 w-4 text-amber-600" />
                         <AlertDescription className="text-amber-700">
-                          Email notifications are disabled. You won't receive
+                          Email notifications are disabled. You won&apos;t receive
                           any email alerts for mailbox events.
                         </AlertDescription>
                       </Alert>
@@ -686,9 +679,12 @@ export default function Settings() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
                         {user?.imageUrl ? (
-                          <img
+                          <Image
                             src={user.imageUrl}
                             alt="Profile"
+                            width={64}
+                            height={64}
+                            unoptimized
                             className="h-16 w-16 rounded-full border-2 border-gray-200"
                           />
                         ) : (
@@ -732,7 +728,7 @@ export default function Settings() {
                 <div className="space-y-4">
                   <p className="text-gray-600">
                     Manage your account details, profile information, and
-                    security settings through Clerk's secure user management
+                    security settings through Clerk&apos;s secure user management
                     portal.
                   </p>
 
