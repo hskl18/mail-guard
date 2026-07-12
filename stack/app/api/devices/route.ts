@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
-import { Device, DevicePayload } from "@/lib/types";
+import {
+  executeQuery,
+  type DatabaseRows,
+  type DatabaseResult,
+  type QueryParameters,
+} from "@/lib/db";
+import { Device } from "@/lib/types";
 import { auth } from "@clerk/nextjs/server";
 import {
   createSecurityResponse,
   logSecurityEvent,
   checkRateLimit,
-  hashApiKey,
 } from "@/lib/api-security";
 
 // GET /api/devices - Get devices with optional filtering (SECURED)
@@ -46,13 +50,12 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const name = searchParams.get("name");
-    const clerkId = searchParams.get("clerk_id");
     const isActive = searchParams.get("is_active");
 
     // SECURITY: Users can only access their own devices unless they're admin
     // For now, enforce users can only see their own devices
     let query = "SELECT * FROM devices WHERE clerk_id = ?";
-    const params: any[] = [userId];
+    const params: QueryParameters = [userId];
 
     if (name) {
       query += " AND name LIKE ?";
@@ -212,7 +215,7 @@ export async function POST(request: NextRequest) {
     }
 
     // SECURITY: Check if serial number is already in use
-    const existingSerial = await executeQuery<any[]>(
+    const existingSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM devices WHERE serial_number = ?",
       [serial_number]
     );
@@ -272,7 +275,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Get the created device
-    const insertResult = result as any;
+    const insertResult = result as DatabaseResult;
     const newDevice = await executeQuery<Device[]>(
       "SELECT * FROM devices WHERE id = ?",
       [insertResult.insertId]

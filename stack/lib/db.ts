@@ -1,6 +1,7 @@
-import type { Pool } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { readFileSync } from "fs";
 import path from "path";
+import { createVerifiedSslConfig } from "./database-tls.mjs";
 
 // Lazy-loaded database configuration
 let pool: Pool | null = null;
@@ -14,10 +15,7 @@ async function getPool(): Promise<Pool> {
 
     if (process.env.MYSQL_SSL_CA) {
       // If SSL_CA is provided in environment, use it
-      sslConfig = {
-        ca: process.env.MYSQL_SSL_CA,
-        rejectUnauthorized: false, // For cloud databases
-      };
+      sslConfig = createVerifiedSslConfig(process.env.MYSQL_SSL_CA);
     } else {
       // Try to read from public/certs directory
       try {
@@ -28,11 +26,7 @@ async function getPool(): Promise<Pool> {
           "rds-ca.pem"
         );
         const ca = readFileSync(certPath, "utf8");
-        sslConfig = {
-          ca: ca,
-          // For cloud databases, we often need to disable strict verification
-          rejectUnauthorized: false,
-        };
+        sslConfig = createVerifiedSslConfig(ca);
         console.log("Using SSL certificate from public/certs/rds-ca.pem");
       } catch (error) {
         const errorMessage =
@@ -42,22 +36,6 @@ async function getPool(): Promise<Pool> {
           errorMessage
         );
       }
-    }
-
-    // Check if we're connecting to a cloud database that might need different SSL handling
-    const isCloudDatabase =
-      process.env.MYSQL_HOST?.includes("aivencloud.com") ||
-      process.env.MYSQL_HOST?.includes("amazonaws.com") ||
-      process.env.MYSQL_HOST?.includes("digitalocean.com");
-
-    if (isCloudDatabase && !sslConfig) {
-      // For cloud databases, try to enable SSL without certificate verification
-      sslConfig = {
-        rejectUnauthorized: false,
-      };
-      console.log(
-        "Cloud database detected, enabling SSL without certificate verification"
-      );
     }
 
     // Database configuration with valid connection pool options
@@ -81,37 +59,12 @@ async function getPool(): Promise<Pool> {
       } with SSL: ${sslConfig ? "enabled" : "disabled"}`
     );
 
-    try {
-      // Create a connection pool
-      pool = mysql.createPool(dbConfig);
-
-      // Test the connection
-      const testConnection = await pool.getConnection();
-      testConnection.release();
-      console.log("Database connection test successful");
-    } catch (error) {
-      console.error("Database connection failed:", error);
-
-      // If SSL connection fails, try without SSL as fallback
-      if (sslConfig) {
-        console.log(
-          "SSL connection failed, attempting connection without SSL..."
-        );
-        const fallbackConfig = { ...dbConfig, ssl: undefined };
-
-        try {
-          pool = mysql.createPool(fallbackConfig);
-          const testConnection = await pool.getConnection();
-          testConnection.release();
-          console.log("Fallback connection without SSL successful");
-        } catch (fallbackError) {
-          console.error("Fallback connection also failed:", fallbackError);
-          throw fallbackError;
-        }
-      } else {
-        throw error;
-      }
-    }
+    // Create and verify exactly one pool configuration.
+    // TLS failures are surfaced instead of silently retrying without verification.
+    pool = mysql.createPool(dbConfig);
+    const testConnection = await pool.getConnection();
+    testConnection.release();
+    console.log("Database connection test successful");
   }
 
   return pool;
@@ -119,7 +72,7 @@ async function getPool(): Promise<Pool> {
 
 export async function executeQuery<T>(
   query: string,
-  params: any[] = []
+  params: Parameters<Pool["execute"]>[1] = []
 ): Promise<T> {
   let connection = null;
   try {
@@ -136,6 +89,10 @@ export async function executeQuery<T>(
     }
   }
 }
+
+export type DatabaseRows = RowDataPacket[];
+export type DatabaseResult = ResultSetHeader;
+export type QueryParameters = Parameters<Pool["execute"]>[1];
 
 // Function to close all database connections (useful for cleanup)
 export async function closePool(): Promise<void> {

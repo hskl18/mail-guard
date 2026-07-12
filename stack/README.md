@@ -1,6 +1,7 @@
 # MailGuard Next.js Application
 
-The core web application for the MailGuard smart mailbox security system. Built with Next.js 15, featuring enterprise-grade security, real-time monitoring, and comprehensive device management.
+The core Next.js application for the MailGuard smart mailbox prototype.
+It demonstrates authentication, monitoring, and device-management flows, but it is not a verified production deployment.
 
 ---
 
@@ -14,7 +15,7 @@ The core web application for the MailGuard smart mailbox security system. Built 
 - **Database**: MySQL with connection pooling
 - **Storage**: AWS S3 for secure image storage
 - **Styling**: Tailwind CSS with shadcn/ui components
-- **Email**: MailerSend for notification delivery
+- **Email**: Resend for notification delivery
 - **Security**: Multi-tier API authentication with rate limiting
 
 ### **Application Structure**
@@ -32,7 +33,6 @@ stack/
 │   │   ├── dashboard/        # Dashboard Data
 │   │   ├── community-reports/# Community Features
 │   │   ├── image/[id]/       # Secure Image Proxy
-│   │   ├── init-db/          # Database Setup
 │   │   └── docs/             # API Documentation
 │   ├── dashboard/            # Dashboard Pages
 │   ├── connect-device/       # Device Onboarding
@@ -103,18 +103,15 @@ if (!authResult.success) {
 - **Authorization**: Users can only access their own data
 - **Protected Routes**: All dashboard routes require authentication
 
-#### **3. Admin Authentication**
-
-- **API Key Format**: `admin_` prefix + 128-character hex string
-- **Rate Limiting**: 10000 requests/hour per admin
-- **Privileged Operations**: Database initialization, system management
+Database schema changes are not exposed through an admin HTTP endpoint.
+Operators use the offline migration CLI from a trusted environment.
 
 ### **Security Features**
 
 - **Rate Limiting**: Per-user/device request throttling
-- **Input Validation**: Comprehensive payload validation
+- **Input Validation**: Payload validation on supported routes
 - **Authorization Checks**: Resource ownership verification
-- **Audit Logging**: Complete security event logging
+- **Audit Logging**: Security event logging helpers
 - **CORS Protection**: Proper origin control
 - **Security Headers**: XSS, clickjacking, and content-type protection
 
@@ -195,7 +192,7 @@ if (!authResult.success) {
 
 #### `GET /api/dashboard` - Dashboard Data
 
-**Purpose**: Comprehensive dashboard data for authenticated user
+**Purpose**: Dashboard data for the authenticated user
 
 **Returns**:
 
@@ -247,18 +244,10 @@ if (!authResult.success) {
 
 **Purpose**: Update report status (for committee members)
 
-### **Admin Endpoints** (Admin API Key Required)
+### **Database Migrations**
 
-#### `POST /api/init-db` - Database Initialization
-
-**Purpose**: Complete database schema setup
-
-**Features**:
-
-- Creates all required tables
-- Sets up security tables
-- Generates sample data
-- Creates admin API keys
+Schema initialization is an offline operator action.
+The migration uses idempotent table creation and never inserts sample users, devices, or administrator keys.
 
 ### **Documentation Endpoint**
 
@@ -268,7 +257,7 @@ if (!authResult.success) {
 
 **Features**:
 
-- Complete API specification
+- Prototype API specification
 - Interactive testing interface
 - Authentication examples
 - Response schemas
@@ -293,7 +282,7 @@ if (!authResult.success) {
 
 #### `components/settings.tsx` (786 lines)
 
-**Purpose**: Comprehensive device configuration
+**Purpose**: Device configuration
 
 **Features**:
 
@@ -339,7 +328,7 @@ if (!authResult.success) {
 
 ### **UI Components** (`components/ui/`)
 
-- Complete shadcn/ui component library
+- shadcn/ui component set
 - Consistent design system
 - Accessible components
 - Dark/light mode support
@@ -375,7 +364,7 @@ const devices = await executeQuery<Device[]>(
 #### **Security Tables**
 
 - `api_keys`: API key management with hashing
-- `security_events`: Comprehensive audit logging
+- `security_events`: Security event records
 
 #### **Device Tables**
 
@@ -474,14 +463,17 @@ AWS_REGION=us-east-1
 S3_BUCKET=your-mailguard-bucket
 
 # Email
-MAILERSEND_API_KEY=mlsn...
-MAILERSEND_FROM_EMAIL=noreply@yourdomain.com
-MAILERSEND_FROM_NAME="Mail Guard Security"
+RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=noreply@yourdomain.com
+RESEND_FROM_NAME="Mail Guard"
 
 # Security
-IOT_API_SECRET_KEY=your-iot-secret
-ADMIN_API_SECRET_KEY=your-admin-secret
 API_ENCRYPTION_SECRET=your-encryption-secret
+COMMITTEE_REVIEWER_IDS=user_example
+
+# Offline migration controls
+DATABASE_MIGRATION_CONFIRM=
+DATABASE_MIGRATION_TARGET=
 
 # Application
 NEXT_PUBLIC_APP_URL=https://your-domain.com
@@ -497,9 +489,11 @@ pnpm install
 cp .env.example .env.local
 # Edit .env.local with your values
 
-# Initialize database
-curl -X POST http://localhost:3000/api/init-db \
-  -H "Authorization: Bearer admin_your_admin_api_key"
+# Preview schema changes without connecting to a database
+pnpm db:migrate -- --dry-run
+
+# Apply from a trusted operator shell after reviewing the dry run
+DATABASE_MIGRATION_CONFIRM=apply DATABASE_MIGRATION_TARGET=host/database pnpm db:migrate -- --apply
 
 # Start development server
 pnpm dev
@@ -516,7 +510,7 @@ pnpm start    # Production server
 
 #### **Deployment Platforms**:
 
-- **Vercel** (Recommended): Automatic deployments
+- **Vercel**: Automatic preview deployments
 - **Railway**: Container-based deployment
 - **DigitalOcean App Platform**: Managed hosting
 - **AWS Amplify**: Full-stack hosting
@@ -624,23 +618,22 @@ python test_iot_data.py
    - Configure authentication providers
    - Set up webhooks (optional)
 
-4. **Email Setup** (MailerSend):
-   - Create MailerSend account
+4. **Email Setup** (Resend):
+   - Create a Resend account
    - Verify sending domain
    - Generate API key
 
 ### **Production Checklist**
 
-- ✅ Environment variables configured
-- ✅ Database schema initialized
-- ✅ Admin API key generated
-- ✅ S3 bucket and IAM configured
-- ✅ Clerk authentication configured
-- ✅ MailerSend domain verified
-- ✅ SSL certificates installed
-- ✅ Security headers configured
-- ✅ Rate limiting configured
-- ✅ Error monitoring set up
+- ⬜ Environment variables configured
+- ⬜ Offline database migration reviewed and applied
+- ⬜ S3 bucket and IAM configured
+- ⬜ Clerk authentication configured
+- ⬜ Resend domain verified
+- ⬜ Database CA certificate installed
+- ⬜ Security controls reviewed for the target environment
+- ⬜ Distributed rate limiting configured
+- ⬜ Error monitoring set up
 
 ---
 
@@ -689,4 +682,4 @@ python test_iot_data.py
 
 ---
 
-**Built with ❤️ using Next.js 15, TypeScript, and enterprise-grade security practices.**
+**Built with Next.js 15 and TypeScript as an evolving security-system prototype.**

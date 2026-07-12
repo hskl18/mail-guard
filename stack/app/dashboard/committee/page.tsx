@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -69,7 +69,6 @@ interface CommunityReportsResponse {
 }
 
 export default function CommitteePage() {
-  const { user } = useUser();
   const router = useRouter();
   const [reports, setReports] = useState<CommunityReport[]>([]);
   const [statistics, setStatistics] = useState({
@@ -578,9 +577,12 @@ export default function CommitteePage() {
                   </div>
                 )}
 
-                <img
+                <Image
                   src={selectedImageUrl}
                   alt="Community report evidence"
+                  width={960}
+                  height={640}
+                  unoptimized
                   className={`max-w-full max-h-[60vh] object-contain rounded-lg border ${
                     imageLoading || imageError ? "hidden" : ""
                   }`}

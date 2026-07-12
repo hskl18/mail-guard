@@ -6,9 +6,7 @@ import {
   MailOpen,
   Clock,
   AlertTriangle,
-  Users,
   Building,
-  X,
   Eye,
   RefreshCw,
   Flag,
@@ -31,8 +29,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -49,6 +45,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import NextImage from "next/image";
+import type { LucideIcon } from "lucide-react";
+import type {
+  Device,
+  DashboardEvent,
+  DashboardImage,
+} from "@/lib/types";
+
+type DashboardDevice = Partial<Device> & Pick<Device, "id" | "name"> & {
+  is_online?: boolean;
+  iot_last_seen?: string;
+};
 
 // Enhanced stats component
 function StatCard({
@@ -58,7 +66,7 @@ function StatCard({
   trend,
   isLoading = false,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   value: string | number;
   trend?: { value: number; isPositive: boolean };
@@ -164,9 +172,9 @@ function StatusIndicator({
 export default function Dashboard() {
   const { user } = useUser();
   const router = useRouter();
-  const [devices, setDevices] = useState<any[]>([]);
-  const [recentEvents, setRecentEvents] = useState<any[]>([]);
-  const [recentImages, setRecentImages] = useState<any[]>([]);
+  const [devices, setDevices] = useState<DashboardDevice[]>([]);
+  const [recentEvents, setRecentEvents] = useState<DashboardEvent[]>([]);
+  const [recentImages, setRecentImages] = useState<DashboardImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRemoving, setIsRemoving] = useState(false);
   const [error, setError] = useState("");
@@ -234,9 +242,9 @@ export default function Dashboard() {
             ? dashboardData.recent_images
             : []
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Dashboard data fetch error:", err);
-        const errorMessage = err.message || "Unknown error";
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
         setError(`Could not load dashboard data. ${errorMessage}`);
 
         if (process.env.NODE_ENV === "development") {
@@ -351,7 +359,7 @@ export default function Dashboard() {
           } else {
             errorMessage = errorData.error || errorMessage;
           }
-        } catch (parseError) {
+          } catch {
           errorMessage = `Server error (${response.status}): ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -476,9 +484,10 @@ export default function Dashboard() {
 
       // Optional: Show success message
       console.log("Device removed successfully");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error removing device:", err);
-      setError(`Failed to remove device: ${err.message}`);
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(`Failed to remove device: ${message}`);
     } finally {
       setIsRemoving(false);
     }
@@ -666,7 +675,7 @@ export default function Dashboard() {
     }
   };
 
-  const findImageForEvent = (event: any) => {
+  const findImageForEvent = (event: DashboardEvent) => {
     // Try to find image for this event
     const eventTime = new Date(event.occurred_at);
 
@@ -719,7 +728,7 @@ export default function Dashboard() {
     return null;
   };
 
-  const handleViewImage = (event: any) => {
+  const handleViewImage = (event: DashboardEvent) => {
     const image = findImageForEvent(event);
     if (image) {
       // Use the image proxy endpoint instead of direct S3 URL
@@ -748,7 +757,9 @@ export default function Dashboard() {
   const deliveryEvents = recentEvents.filter(
     (event) => event.event_type === "delivery"
   );
-  const isDeviceOnline = currentDevice.is_online ?? currentDevice.is_active;
+  const isDeviceOnline = Boolean(
+    currentDevice.is_online ?? currentDevice.is_active
+  );
 
   return (
     <div className="space-y-8">
@@ -948,9 +959,12 @@ export default function Dashboard() {
             {selectedImage && (
               <div className="relative bg-gray-50 rounded-lg p-4">
                 <div className="flex justify-center">
-                  <img
+                  <NextImage
                     src={selectedImage}
                     alt="Event captured image"
+                    width={960}
+                    height={640}
+                    unoptimized
                     className="max-w-full max-h-[50vh] object-contain rounded-lg border shadow-sm"
                     onError={(e) => {
                       console.error("Image failed to load:", selectedImage);

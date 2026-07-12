@@ -1,30 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { useState } from "react";
 import {
   Mail,
-  Shield,
   Bell,
   ArrowRight,
-  Check,
-  Info,
-  CreditCard,
-  HelpCircle,
   Star,
   Building,
   Home,
-  School,
-  Briefcase,
   Package,
   Camera,
-  Users,
   BellRing,
   CheckCircle,
-  BookOpen,
   Menu,
   X,
 } from "lucide-react";
@@ -246,10 +238,12 @@ export default function LandingPage() {
               <div className="flex items-center justify-center">
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-2xl blur-2xl opacity-20 scale-105"></div>
-                  <img
+                  <Image
                     alt="Smart Cluster Mailbox"
                     className="relative w-full max-w-lg rounded-2xl shadow-2xl object-cover border border-gray-200"
-                    src="mailbox.png"
+                    src="/mailbox.png"
+                    width={960}
+                    height={640}
                   />
                 </div>
               </div>

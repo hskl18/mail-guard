@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import { executeQuery, type DatabaseRows, type DatabaseResult } from "@/lib/db";
 import {
   authenticateIoTDevice,
   createSecurityResponse,
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if device serial is valid
-    const deviceSerial = await executeQuery<any[]>(
+    const deviceSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = 1",
       [serial_number]
     );
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Check if device is claimed by a user (linked to dashboard)
-    const dashboardDevice = await executeQuery<any[]>(
+    const dashboardDevice = await executeQuery<DatabaseRows>(
       "SELECT * FROM devices WHERE serial_number = ?",
       [serial_number]
     );
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
         signal_strength,
         temperature_celsius,
         deviceSerial: authResult.deviceSerial,
-        event_id: result ? (result as any).insertId : null,
+        event_id: result ? (result as DatabaseResult).insertId : null,
       },
       request
     );
@@ -298,16 +298,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if device exists (by ID or name)
-    let devices: any[];
-    let actualDeviceId: string;
+    let devices: DatabaseRows;
 
     if (deviceName) {
-      devices = await executeQuery<any[]>(
+      devices = await executeQuery<DatabaseRows>(
         "SELECT id, clerk_id, serial_number FROM devices WHERE name = ?",
         [deviceName]
       );
     } else {
-      devices = await executeQuery<any[]>(
+      devices = await executeQuery<DatabaseRows>(
         "SELECT id, clerk_id, serial_number FROM devices WHERE id = ?",
         [deviceId]
       );
@@ -328,7 +327,7 @@ export async function GET(request: NextRequest) {
     }
 
     const device = devices[0];
-    actualDeviceId = device.id;
+    const actualDeviceId = device.id;
 
     // SECURITY: Additional validation - if we have device serial from auth,
     // verify it matches the device being reported for
@@ -371,7 +370,7 @@ export async function GET(request: NextRequest) {
       {
         device_id: actualDeviceId,
         event_type: eventType,
-        event_id: (result as any).insertId,
+        event_id: (result as DatabaseResult).insertId,
         clerk_id: device.clerk_id,
         deviceSerial: authResult.deviceSerial,
       },
@@ -381,7 +380,7 @@ export async function GET(request: NextRequest) {
     // Return minimal response for IoT devices
     return NextResponse.json({
       status: "ok",
-      event_id: (result as any).insertId,
+      event_id: (result as DatabaseResult).insertId,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

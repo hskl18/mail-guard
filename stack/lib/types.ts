@@ -60,6 +60,28 @@ export interface Image {
   captured_at: string;
 }
 
+export interface DashboardEvent {
+  id: number | string;
+  device_id: number | string;
+  event_type: string;
+  occurred_at: string;
+  device_name?: string;
+  device_location?: string;
+  serial_number?: string;
+  source?: "iot";
+}
+
+export interface DashboardImage {
+  id: number | string;
+  device_id: number | string;
+  image_url: string;
+  captured_at: string;
+  event_type?: string;
+  device_name?: string;
+  serial_number?: string;
+  source?: "iot";
+}
+
 export interface DeviceHealth {
   clerk_id: string;
   battery_level?: number;
@@ -104,8 +126,8 @@ export interface HeartbeatPayload {
 
 export interface DashboardData {
   devices: Device[];
-  recent_events: MailboxEvent[];
-  recent_images: Image[];
+  recent_events: DashboardEvent[];
+  recent_images: DashboardImage[];
   notification_count: number;
 }
 

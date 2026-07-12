@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -29,7 +28,6 @@ import {
   Mail,
   AlertCircle,
   Camera,
-  Calendar,
   TrendingUp,
   Activity,
 } from "lucide-react";
@@ -40,6 +38,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import type { LucideIcon } from "lucide-react";
+
+interface CommunityReportResponse {
+  id: number;
+  zip_code: string;
+  description?: string;
+  submitted_at: string;
+  image_url?: string;
+  status: CommunityReport["status"];
+}
 
 interface CommunityReport {
   id: string;
@@ -58,7 +66,7 @@ function CommitteeStatCard({
   description,
   color = "blue",
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   value: string | number;
   description: string;
@@ -112,59 +120,7 @@ function CommitteeStatCard({
 }
 
 // Enhanced status badge component
-function StatusBadge({ status }: { status: CommunityReport["status"] }) {
-  const getStatusConfig = (status: CommunityReport["status"]) => {
-    switch (status) {
-      case "pending":
-        return {
-          icon: Clock,
-          text: "Pending Review",
-          variant: "secondary" as const,
-          color: "text-yellow-600",
-          bgColor: "bg-yellow-50",
-        };
-      case "reviewed":
-        return {
-          icon: Eye,
-          text: "Under Review",
-          variant: "secondary" as const,
-          color: "text-blue-600",
-          bgColor: "bg-blue-50",
-        };
-      case "resolved":
-        return {
-          icon: CheckCircle,
-          text: "Resolved",
-          variant: "default" as const,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-        };
-      default:
-        return {
-          icon: AlertTriangle,
-          text: "Unknown",
-          variant: "secondary" as const,
-          color: "text-gray-600",
-          bgColor: "bg-gray-50",
-        };
-    }
-  };
-
-  const config = getStatusConfig(status);
-  const StatusIcon = config.icon;
-
-  return (
-    <div
-      className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${config.bgColor} ${config.color}`}
-    >
-      <StatusIcon className="h-3 w-3" />
-      {config.text}
-    </div>
-  );
-}
-
 export default function Committee() {
-  const { user } = useUser();
   const searchParams = useSearchParams();
   const [reports, setReports] = useState<CommunityReport[]>([]);
   const [currentReport, setCurrentReport] = useState<CommunityReport | null>(
@@ -209,7 +165,7 @@ export default function Committee() {
 
         // Convert API response to our local format
         const fetchedReports: CommunityReport[] = data.reports.map(
-          (report: any) => ({
+          (report: CommunityReportResponse) => ({
             id: report.id.toString(),
             zipCode: report.zip_code,
             description: report.description || "No description provided",
@@ -221,7 +177,7 @@ export default function Committee() {
 
         // If there's a current report from URL params, merge it with fetched reports
         // Make sure not to duplicate it
-        setReports((prevReports) => {
+        setReports(() => {
           const currentReportExists =
             currentReport &&
             fetchedReports.some((r) => r.id === currentReport.id);
@@ -368,7 +324,7 @@ export default function Committee() {
                 </h4>
                 <p className="text-green-700 mt-1">
                   Your report has been forwarded to the community committee for
-                  review. You'll receive updates as the committee investigates
+                  review. You&apos;ll receive updates as the committee investigates
                   this issue.
                 </p>
               </div>
@@ -683,9 +639,12 @@ export default function Committee() {
                 )}
 
                 <div className="flex justify-center">
-                  <img
+                  <Image
                     src={selectedImageUrl}
                     alt="Community report evidence"
+                    width={960}
+                    height={640}
+                    unoptimized
                     className={`max-w-full max-h-[50vh] object-contain rounded-lg border shadow-sm ${
                       imageLoading || imageError ? "hidden" : ""
                     }`}

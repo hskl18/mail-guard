@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import { executeQuery, type DatabaseRows, type DatabaseResult } from "@/lib/db";
 import { uploadToS3 } from "@/lib/s3";
 import {
   authenticateIoTDevice,
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if device serial is valid (additional validation beyond API key)
-    const deviceSerial = await executeQuery<any[]>(
+    const deviceSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = 1",
       [serialNumber]
     );
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       const s3Url = await uploadToS3(fileBuffer, fileName, file.type);
 
       // Check if device is claimed by a user (linked to dashboard)
-      const dashboardDevice = await executeQuery<any[]>(
+      const dashboardDevice = await executeQuery<DatabaseRows>(
         "SELECT * FROM devices WHERE serial_number = ?",
         [serialNumber]
       );
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
           [deviceId, eventType, clerkId]
         );
 
-        const eventId = (eventResult as any).insertId;
+        const eventId = (eventResult as DatabaseResult).insertId;
 
         // Try inserting with event_id first, fallback without it if column doesn't exist
         try {
@@ -186,9 +186,13 @@ export async function POST(request: NextRequest) {
              VALUES (?, ?, NOW(), ?)`,
             [deviceId, s3Url, eventId]
           );
-        } catch (dbError: any) {
+        } catch (dbError: unknown) {
           // If event_id column doesn't exist, insert without it
-          if (dbError.code === "ER_BAD_FIELD_ERROR") {
+          if (
+            dbError instanceof Error &&
+            "code" in dbError &&
+            dbError.code === "ER_BAD_FIELD_ERROR"
+          ) {
             console.log("event_id column not found, inserting without it");
             imageRecord = await executeQuery(
               `INSERT INTO images (device_id, image_url, captured_at) 
@@ -203,7 +207,7 @@ export async function POST(request: NextRequest) {
         // Send email notification if user has email notifications enabled for this event type
         try {
           // Get device notification preferences
-          const userDevice = await executeQuery<any[]>(
+          const userDevice = await executeQuery<DatabaseRows>(
             `SELECT name, email_notifications, mail_delivered_notify, mailbox_opened_notify, mail_removed_notify 
              FROM devices WHERE id = ?`,
             [deviceId]
@@ -237,7 +241,7 @@ export async function POST(request: NextRequest) {
                 );
 
                 // Create image proxy URL for email
-                const imageId = (imageRecord as any).insertId;
+                const imageId = (imageRecord as DatabaseResult).insertId;
                 const baseUrl =
                   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
                 const imageProxyUrl = `${baseUrl}/api/image/${imageId}`;
@@ -280,7 +284,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             message: "Image uploaded successfully",
-            image_id: (imageRecord as any).insertId,
+            image_id: (imageRecord as DatabaseResult).insertId,
             image_url: s3Url,
             device_id: deviceId,
             event_id: eventId,
@@ -314,7 +318,7 @@ export async function POST(request: NextRequest) {
           {
             message:
               "IoT image uploaded successfully (no dashboard device linked)",
-            iot_image_id: (imageRecord as any).insertId,
+            iot_image_id: (imageRecord as DatabaseResult).insertId,
             image_url: s3Url,
             serial_number: serialNumber,
             event_type: eventType,
@@ -414,7 +418,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if device serial exists
-    const deviceSerial = await executeQuery<any[]>(
+    const deviceSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM device_serials WHERE serial_number = ?",
       [serialNumber]
     );
@@ -435,7 +439,7 @@ export async function GET(request: NextRequest) {
 
     iotQuery += ` ORDER BY captured_at DESC LIMIT ${limit}`;
 
-    const iotImages = await executeQuery<any[]>(iotQuery, [serialNumber]);
+    const iotImages = await executeQuery<DatabaseRows>(iotQuery, [serialNumber]);
 
     logSecurityEvent(
       "IOT_IMAGES_RETRIEVED",

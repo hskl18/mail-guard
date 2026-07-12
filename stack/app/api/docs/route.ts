@@ -7,10 +7,6 @@ const API_DOCS = {
     description:
       "Smart Mailbox Monitoring System API - IoT Device → HTTP API → User Dashboard",
     version: "2.0.0",
-    contact: {
-      name: "Mail Guard Team",
-      email: "support@mailguard.com",
-    },
   },
   servers: [
     {
@@ -30,10 +26,6 @@ const API_DOCS = {
     {
       name: "📊 Dashboard",
       description: "User dashboard and data display",
-    },
-    {
-      name: "🔧 Setup",
-      description: "Database and system initialization",
     },
   ],
   paths: {
@@ -557,21 +549,6 @@ const API_DOCS = {
         responses: {
           "200": {
             description: "Device removed successfully",
-          },
-        },
-      },
-    },
-    "/init-db": {
-      post: {
-        tags: ["🔧 Setup"],
-        summary: "🗄️ Initialize Database",
-        description: "Create all required database tables and schema",
-        responses: {
-          "200": {
-            description: "Database initialized successfully",
-          },
-          "207": {
-            description: "Partial success - some operations failed",
           },
         },
       },

@@ -13,12 +13,10 @@ import {
   Mail,
   Shield,
   BarChart3,
-  BookOpen,
   Users,
 } from "lucide-react";
 import UserNav from "@/components/user-nav";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 export default function AuthenticatedApp() {
   const searchParams = useSearchParams();

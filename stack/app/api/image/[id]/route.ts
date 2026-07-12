@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import { executeQuery, type DatabaseRows } from "@/lib/db";
 import { getFromS3 } from "@/lib/s3";
 import { auth } from "@clerk/nextjs/server";
 import {
@@ -78,7 +78,7 @@ export async function GET(
       const actualId = imageId.replace("iot_", "");
 
       // SECURITY: Check if user has access to this IoT image
-      const iotImages = await executeQuery<any[]>(
+      const iotImages = await executeQuery<DatabaseRows>(
         `SELECT ii.*, ds.claimed_by_clerk_id 
          FROM iot_images ii
          JOIN device_serials ds ON ii.serial_number = ds.serial_number
@@ -106,7 +106,7 @@ export async function GET(
 
       if (!authorizedAccess) {
         // Also check if device is linked to user's dashboard
-        const dashboardDevice = await executeQuery<any[]>(
+        const dashboardDevice = await executeQuery<DatabaseRows>(
           `SELECT id FROM devices WHERE serial_number = ? AND clerk_id = ?`,
           [imageData.serial_number, userId]
         );
@@ -132,7 +132,7 @@ export async function GET(
     } else {
       // Regular dashboard image
       // SECURITY: Check if user has access to this dashboard image
-      const images = await executeQuery<any[]>(
+      const images = await executeQuery<DatabaseRows>(
         `SELECT i.*, d.clerk_id 
          FROM images i
          JOIN devices d ON i.device_id = d.id
@@ -209,14 +209,7 @@ export async function GET(
       }
 
       // Convert stream to buffer
-      const chunks: Uint8Array[] = [];
-      const stream = s3Response.Body as any;
-
-      for await (const chunk of stream) {
-        chunks.push(chunk);
-      }
-
-      const buffer = Buffer.concat(chunks);
+      const buffer = Buffer.from(await s3Response.Body.transformToByteArray());
 
       logSecurityEvent(
         "IMAGE_ACCESS_SUCCESS",
@@ -319,7 +312,7 @@ export async function HEAD(
       const actualId = imageId.replace("iot_", "");
 
       // SECURITY: Check if user has access to this IoT image
-      const iotImages = await executeQuery<any[]>(
+      const iotImages = await executeQuery<DatabaseRows>(
         `SELECT ii.id, ds.claimed_by_clerk_id, ii.serial_number
          FROM iot_images ii
          JOIN device_serials ds ON ii.serial_number = ds.serial_number
@@ -336,7 +329,7 @@ export async function HEAD(
 
         if (!authorizedAccess) {
           // Also check if device is linked to user's dashboard
-          const dashboardDevice = await executeQuery<any[]>(
+          const dashboardDevice = await executeQuery<DatabaseRows>(
             `SELECT id FROM devices WHERE serial_number = ? AND clerk_id = ?`,
             [imageData.serial_number, userId]
           );
@@ -346,7 +339,7 @@ export async function HEAD(
     } else {
       // Regular dashboard image
       // SECURITY: Check if user has access to this dashboard image
-      const images = await executeQuery<any[]>(
+      const images = await executeQuery<DatabaseRows>(
         `SELECT i.id, d.clerk_id 
          FROM images i
          JOIN devices d ON i.device_id = d.id

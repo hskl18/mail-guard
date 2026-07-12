@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/db";
+import { executeQuery, type DatabaseRows, type DatabaseResult } from "@/lib/db";
 import { sendEventNotification } from "@/lib/email";
 import { clerkClient } from "@clerk/nextjs/server";
 import {
@@ -54,7 +54,6 @@ export async function POST(request: NextRequest) {
     const {
       serial_number,
       event_data,
-      timestamp,
       firmware_version,
       battery_level,
       signal_strength,
@@ -92,7 +91,6 @@ export async function POST(request: NextRequest) {
     const {
       reed_sensor,
       event_type,
-      mailbox_status,
       weight_sensor,
       weight_value,
       weight_threshold,
@@ -106,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if device serial is valid (additional validation beyond API key)
-    const deviceSerial = await executeQuery<any[]>(
+    const deviceSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM device_serials WHERE serial_number = ? AND is_valid = 1",
       [serial_number]
     );
@@ -153,7 +151,7 @@ export async function POST(request: NextRequest) {
 
     if (weight_sensor !== undefined || weight_value !== undefined) {
       try {
-        const lastWeight = await executeQuery<any[]>(
+        const lastWeight = await executeQuery<DatabaseRows>(
           `SELECT weight_value FROM iot_device_status 
            WHERE serial_number = ? AND weight_value IS NOT NULL 
            ORDER BY last_seen DESC LIMIT 1`,
@@ -172,11 +170,14 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-      } catch (weightError: any) {
+      } catch (weightError: unknown) {
         // If weight_value column doesn't exist, skip weight comparison
         if (
-          weightError.code === "ER_BAD_FIELD_ERROR" ||
-          weightError.message?.includes("weight_value")
+          (weightError instanceof Error &&
+            "code" in weightError &&
+            weightError.code === "ER_BAD_FIELD_ERROR") ||
+          (weightError instanceof Error &&
+            weightError.message.includes("weight_value"))
         ) {
           console.log(
             "Weight sensor data requested but weight_value column not available"
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update or create device status
-    const existingStatus = await executeQuery<any[]>(
+    const existingStatus = await executeQuery<DatabaseRows>(
       "SELECT * FROM iot_device_status WHERE serial_number = ?",
       [serial_number]
     );
@@ -280,7 +281,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if device is claimed by a user (linked to dashboard)
-    const dashboardDevice = await executeQuery<any[]>(
+    const dashboardDevice = await executeQuery<DatabaseRows>(
       "SELECT * FROM devices WHERE serial_number = ?",
       [serial_number]
     );
@@ -342,7 +343,7 @@ export async function POST(request: NextRequest) {
       // Send email notification if user has email notifications enabled
       try {
         // Get device notification preferences (without email)
-        const userDevice = await executeQuery<any[]>(
+        const userDevice = await executeQuery<DatabaseRows>(
           `SELECT name, email_notifications, mail_delivered_notify, mailbox_opened_notify, mail_removed_notify 
            FROM devices WHERE id = ?`,
           [deviceId]
@@ -440,7 +441,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         message: "Event recorded successfully",
-        event_id: (eventResult as any).insertId,
+        event_id: (eventResult as DatabaseResult).insertId,
         event_type: standardEventType,
         detection_method: detectionMethod,
         device_id: deviceId,
@@ -496,7 +497,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         message: "IoT event recorded (unclaimed device)",
-        iot_event_id: (iotEventResult as any).insertId,
+        iot_event_id: (iotEventResult as DatabaseResult).insertId,
         event_type: standardEventType,
         detection_method: detectionMethod,
         serial_number: serial_number,
@@ -587,7 +588,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if device serial exists
-    const deviceSerial = await executeQuery<any[]>(
+    const deviceSerial = await executeQuery<DatabaseRows>(
       "SELECT * FROM device_serials WHERE serial_number = ?",
       [serialNumber]
     );
@@ -597,7 +598,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Simplified - get IoT-specific events only
-    const iotEvents = await executeQuery<any[]>(
+    const iotEvents = await executeQuery<DatabaseRows>(
       `SELECT * FROM iot_events 
        WHERE serial_number = ? 
        ORDER BY occurred_at DESC 
