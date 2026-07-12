@@ -202,16 +202,15 @@ export default function LandingPage() {
               <div className="flex flex-col justify-center space-y-8 text-center lg:text-left">
                 <div className="space-y-4">
                   <Badge variant="outline" className="w-fit mx-auto lg:mx-0">
-                    🏠 Smart Mailbox Technology
+                    Software prototype
                   </Badge>
                   <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                    Smart Cluster Mailbox
+                    Mailbox Event Monitoring
                   </h1>
                   <p className="mx-auto lg:mx-0 max-w-[600px] text-gray-600 text-lg md:text-xl leading-relaxed">
-                    Advanced cluster mailboxes with integrated smart features
-                    that identify mail types, send instant notifications upon
-                    delivery, monitor fullness levels, and provide individual
-                    serial numbers for each compartment.
+                    An engineering prototype for receiving mailbox device
+                    events, associating image evidence, and reviewing activity
+                    through an authenticated dashboard.
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -220,7 +219,7 @@ export default function LandingPage() {
                       size="lg"
                       className="w-full sm:w-auto text-base px-8 py-3"
                     >
-                      Get Started
+                      Open Dashboard
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
@@ -230,7 +229,7 @@ export default function LandingPage() {
                       size="lg"
                       className="w-full sm:w-auto text-base px-8 py-3"
                     >
-                      Explore Features
+                      Review Workflow
                     </Button>
                   </Link>
                 </div>
@@ -239,7 +238,7 @@ export default function LandingPage() {
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-2xl blur-2xl opacity-20 scale-105"></div>
                   <Image
-                    alt="Smart Cluster Mailbox"
+                    alt="Concept mailbox used to illustrate the Mail Guard prototype"
                     className="relative w-full max-w-lg rounded-2xl shadow-2xl object-cover border border-gray-200"
                     src="/mailbox.png"
                     width={960}
@@ -256,14 +255,14 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 md:px-6">
             <div className="text-center mb-16">
               <Badge variant="secondary" className="mb-4">
-                Core Features
+                Implemented Scope
               </Badge>
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
-                Advanced Monitoring Capabilities
+                A Full-stack Software Workflow
               </h2>
               <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
-                State-of-the-art technology built into every cluster mailbox
-                compartment
+                The repository connects device-facing APIs, authenticated data
+                access, image storage, notifications, and dashboard views.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -274,12 +273,11 @@ export default function LandingPage() {
                       <Package className="h-8 w-8 text-blue-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Mail Type Detection
+                      Device Event Intake
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Smart sensors automatically identify different types of
-                      mail and packages, providing detailed delivery information
-                      and categorization.
+                      Device clients can submit structured delivery and access
+                      events through authenticated API endpoints.
                     </p>
                   </div>
                 </div>
@@ -291,12 +289,11 @@ export default function LandingPage() {
                       <BellRing className="h-8 w-8 text-green-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Fullness Monitoring
+                      Sensor Status
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Real-time tracking of compartment capacity with
-                      intelligent notifications when approaching maximum
-                      capacity.
+                      Sensor readings can be stored with event history and
+                      presented in the authenticated dashboard.
                     </p>
                   </div>
                 </div>
@@ -308,12 +305,11 @@ export default function LandingPage() {
                       <Camera className="h-8 w-8 text-purple-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Serial Number Access
+                      Device Activation
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Each compartment features a unique serial number for
-                      seamless website integration and comprehensive status
-                      monitoring.
+                      Device serial numbers connect incoming events to the
+                      correct owner after an explicit activation flow.
                     </p>
                   </div>
                 </div>
@@ -327,14 +323,14 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 md:px-6">
             <div className="text-center mb-16">
               <Badge variant="secondary" className="mb-4">
-                Platform Features
+                Application Layers
               </Badge>
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
-                Complete Mail Management
+                Evidence from Device to Dashboard
               </h2>
               <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
-                Everything you need for secure, efficient mail management and
-                monitoring
+                The prototype focuses on traceable events, ownership boundaries,
+                and operator-visible status.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
@@ -345,11 +341,11 @@ export default function LandingPage() {
                       <Package className="h-8 w-8 text-orange-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Secure Package Drop
+                      Access Event Records
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Track every access to your delivery hub with comprehensive
-                      timestamped records of all door events and activities.
+                      Store timestamped device events so authenticated owners can
+                      review delivery and access history.
                     </p>
                   </div>
                 </div>
@@ -361,11 +357,11 @@ export default function LandingPage() {
                       <Camera className="h-8 w-8 text-indigo-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Photo Evidence
+                      Image Evidence
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Automatic image capture during mail area access events for
-                      complete visual verification and security documentation.
+                      Associate uploaded images with device events and serve them
+                      through an ownership-checked proxy.
                     </p>
                   </div>
                 </div>
@@ -377,12 +373,11 @@ export default function LandingPage() {
                       <Bell className="h-8 w-8 text-red-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Real-time Notifications
+                      Email Notification Path
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Instant alerts delivered via email, SMS, or mobile app
-                      whenever mail arrives or is accessed from your
-                      compartment.
+                      Exercise an event-driven email path through Resend when the
+                      required hosted service configuration is available.
                     </p>
                   </div>
                 </div>
@@ -407,14 +402,14 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 md:px-6">
             <div className="text-center mb-16">
               <Badge variant="outline" className="mb-4">
-                🏢 Premium Properties
+                Evaluation Scenarios
               </Badge>
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
-                Perfect for Premium Properties
+                Designed for Architecture Evaluation
               </h2>
               <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
-                Designed specifically for luxury developments and sophisticated
-                communities
+                Use the prototype to examine how a mailbox monitoring system
+                could serve several multi-unit environments.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -425,11 +420,11 @@ export default function LandingPage() {
                       <Building className="h-8 w-8 text-cyan-600" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Luxury Apartments
+                      Apartment Buildings
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      High-end residential complexes with premium amenities
-                      requiring sophisticated mail management solutions.
+                      Model compartment ownership, delivery events, and resident
+                      access in a shared building.
                     </p>
                   </div>
                 </div>
@@ -444,8 +439,8 @@ export default function LandingPage() {
                       HOA Communities
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Gated communities and homeowner associations seeking
-                      enhanced security and convenience for all residents.
+                      Explore role and ownership boundaries for shared community
+                      infrastructure.
                     </p>
                   </div>
                 </div>
@@ -460,8 +455,8 @@ export default function LandingPage() {
                       New Construction
                     </h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Modern developments incorporating cutting-edge smart
-                      infrastructure from the ground up.
+                      Evaluate API, storage, and dashboard integration before
+                      selecting or deploying physical devices.
                     </p>
                   </div>
                 </div>
@@ -475,32 +470,30 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto text-center">
               <Badge variant="outline" className="mb-6">
-                ✨ Ready to Use
+                Prototype Boundaries
               </Badge>
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-6">
-                Integrated Smart Technology
+                Scope and Open Validation Work
               </h2>
               <p className="text-gray-600 text-lg md:text-xl leading-relaxed mb-8 max-w-3xl mx-auto">
-                Our cluster mailboxes come with all smart features pre-installed
-                and ready to use. Mailbox owners receive{" "}
-                <span className="font-semibold text-primary">
-                  free membership
-                </span>{" "}
-                to our comprehensive Delivery Hub platform.
+                Mail Guard is a software prototype. The repository demonstrates
+                the application architecture. A real deployment requires
+                validation with mailbox hardware, hosted services, monitoring,
+                and incident response.
               </p>
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8 mb-8">
                 <div className="flex flex-col md:flex-row items-center justify-center gap-6">
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="h-6 w-6 text-green-500" />
-                    <span className="font-medium">Pre-installed sensors</span>
+                    <span className="font-medium">Web and API prototype</span>
                   </div>
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="h-6 w-6 text-green-500" />
-                    <span className="font-medium">Cloud connectivity</span>
+                    <span className="font-medium">Hosted services required</span>
                   </div>
                   <div className="flex items-center space-x-3">
                     <CheckCircle className="h-6 w-6 text-green-500" />
-                    <span className="font-medium">Free platform access</span>
+                    <span className="font-medium">Hardware validation pending</span>
                   </div>
                 </div>
               </div>
@@ -523,41 +516,40 @@ export default function LandingPage() {
           <div className="container mx-auto px-4 md:px-6">
             <div className="text-center mb-16">
               <Badge variant="secondary" className="mb-4">
-                ❓ Support
+                Technical Notes
               </Badge>
               <h2 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl mb-4">
-                Frequently Asked Questions
+                Prototype Questions
               </h2>
               <p className="mx-auto text-gray-600 text-lg md:text-xl max-w-3xl leading-relaxed">
-                Find answers to common questions about our smart mailbox
-                technology
+                Clear boundaries make the implementation easier to evaluate.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
               {[
                 {
-                  q: "How does the smart technology work?",
-                  a: "Our cluster mailboxes come with integrated sensors, cameras, and connectivity built right in. No additional installation or setup required - everything works out of the box.",
+                  q: "What is implemented in this repository?",
+                  a: "The project includes device-facing APIs, an authenticated dashboard, ownership checks, event and image records, email integration, and an experimental ESP32 firmware path.",
                 },
                 {
-                  q: "Do I need to download an app?",
-                  a: "While we offer a mobile app for the best experience, you can also receive notifications via email or SMS and access information through our web dashboard.",
+                  q: "Is this a deployable mailbox product?",
+                  a: "No. It is an engineering prototype for evaluating the software architecture and device workflow, not a manufactured or production-validated mailbox system.",
                 },
                 {
-                  q: "What's included with my mailbox?",
-                  a: "Every smart mailbox includes all sensors, camera system, cloud connectivity, and free access to our Delivery Hub platform with no additional subscription fees.",
+                  q: "Which external services are required?",
+                  a: "The full workflow depends on configured Clerk, MySQL, S3, and Resend services. The repository documents these dependencies and local setup requirements.",
                 },
                 {
-                  q: "How reliable is the system?",
-                  a: "Our sensors are battery-powered with 6-12 month life and continue working during power outages. The system maintains 99.9% uptime with automatic updates.",
+                  q: "What has not been validated?",
+                  a: "Production reliability, device durability, power behavior, sensor accuracy, connectivity, monitoring, incident response, and a complete security review remain open validation work.",
                 },
                 {
-                  q: "Can I integrate with other systems?",
-                  a: "Yes, our platform includes API access for integration with property management systems, building automation, and other smart home technologies.",
+                  q: "Can the API be extended?",
+                  a: "The current API demonstrates device events and dashboard data. Any third-party integration would require its own contract, authorization model, tests, and operational validation.",
                 },
                 {
-                  q: "How is my privacy protected?",
-                  a: "All data is encrypted end-to-end. Images and information are only accessible to authorized users, and we never share data with third parties.",
+                  q: "Which security boundaries are demonstrated?",
+                  a: "The prototype includes Clerk sessions, device credentials, ownership-scoped reads and writes, verified database TLS, rate limiting, and authorized image access. These controls do not replace a production security review.",
                 },
               ].map((faq, index) => (
                 <div key={index} className="group">
@@ -586,8 +578,8 @@ export default function LandingPage() {
                 <span className="font-bold text-xl">Mail Guard</span>
               </Link>
               <p className="text-gray-600 leading-relaxed max-w-md">
-                Smart cluster mailbox technology with integrated monitoring,
-                notifications, and security features for premium properties.
+                An IoT mailbox monitoring prototype focused on explicit
+                ownership, event evidence, and full-stack integration.
               </p>
             </div>
             <div>
@@ -608,19 +600,19 @@ export default function LandingPage() {
               </nav>
             </div>
             <div>
-              <h4 className="font-semibold text-gray-900 mb-4">Support</h4>
+              <h4 className="font-semibold text-gray-900 mb-4">Project</h4>
               <nav className="space-y-2">
                 <Link
-                  href="#"
+                  href="/docs"
                   className="block text-gray-600 hover:text-primary transition-colors"
                 >
-                  Help Center
+                  API Docs
                 </Link>
                 <Link
-                  href="#"
+                  href="https://github.com/hskl18/mail-guard"
                   className="block text-gray-600 hover:text-primary transition-colors"
                 >
-                  Contact Us
+                  Source Code
                 </Link>
               </nav>
             </div>
@@ -628,22 +620,9 @@ export default function LandingPage() {
           <div className="border-t pt-8">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <p className="text-sm text-gray-500">
-                © 2025 Mail Guard. All rights reserved.
+                Mail Guard engineering prototype. See the repository for scope
+                and limitations.
               </p>
-              <nav className="flex gap-6">
-                <Link
-                  href="#"
-                  className="text-sm text-gray-500 hover:text-primary transition-colors"
-                >
-                  Terms of Service
-                </Link>
-                <Link
-                  href="#"
-                  className="text-sm text-gray-500 hover:text-primary transition-colors"
-                >
-                  Privacy Policy
-                </Link>
-              </nav>
             </div>
           </div>
         </div>
