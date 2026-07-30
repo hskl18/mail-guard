@@ -42,7 +42,12 @@ const nextConfig = {
 
   // Optimize images
   images: {
-    domains: ["s3.amazonaws.com"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "s3.amazonaws.com",
+      },
+    ],
     formats: ["image/webp", "image/avif"],
   },
 };
