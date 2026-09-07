@@ -2,6 +2,7 @@ packages:
   - "."
 
 overrides:
+  browserslist@<4.28.7: 4.28.7
   brace-expansion@<1.1.18: 1.1.18
   brace-expansion@>=4.0.0 <5.0.9: 5.0.9
   js-yaml@>=4.0.0 <4.3.1: 4.3.1
