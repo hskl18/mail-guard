@@ -56,7 +56,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v6.0.10
         with:
-          version: 10.17.0
+          version: 10.34.5
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -68,8 +68,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Audit production dependencies
-        run: pnpm audit --prod --audit-level high
+      - name: Audit all dependencies
+        run: pnpm audit --audit-level high
 
       - name: Test offline migrations
         run: pnpm test

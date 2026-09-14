@@ -1,0 +1,9 @@
+**
+!lambda/
+!lambda/Dockerfile.lambda
+!lambda/requirements.txt
+!lambda/main.py
+!stack/
+!stack/public/
+!stack/public/certs/
+!stack/public/certs/rds-ca.pem
