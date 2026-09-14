@@ -1,11 +1,9 @@
-version: "3.8"
 services:
   api:
     build:
-      context: .
-      dockerfile: Dockerfile.lambda
+      context: ..
+      dockerfile: lambda/Dockerfile.lambda
     container_name: mailbox_api
     env_file: .env
     ports:
       - "9000:8080"
-
