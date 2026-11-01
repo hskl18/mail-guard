@@ -13,7 +13,8 @@ Keep Next.js and its ESLint packages on the same version.
 Routine Node package releases have a seven-day minimum age configured in `pnpm-workspace.yaml`.
 For an urgent security release, review its advisory and use a narrowly scoped age exception when needed.
 
-The pnpm overrides for `sharp` and `js-yaml` enforce patched versions even when upstream dependencies request older releases.
+The pnpm overrides for `sharp`, `js-yaml`, `brace-expansion`, `nanoid`, `source-map-js`, and `postcss-selector-parser` enforce patched versions even when upstream dependencies request older releases.
+`pnpm audit` still reports a moderate `minimatch` advisory through the ESLint toolchain, fixed only in `minimatch` 11, and a low `deepmerge` advisory with no patched release; CI fails on high and critical advisories.
 Browserslist stays at `4.28.7` because the resolved `update-browserslist-db` version declares that exact peer version.
 MailerSend stays at `0.6.0` because the Lambda uses `emails.NewEmail`, which version 2 removed.
 Move to MailerSend 2 only together with a verified notification API migration.
@@ -90,4 +91,7 @@ Firmware compilation does not verify camera, Wi-Fi, scale calibration, or a phys
 - [Windows Next.js advisory](https://github.com/advisories/GHSA-p293-qw3h-jr36)
 - [AVIF Next.js advisory](https://github.com/advisories/GHSA-2xp9-vwfh-vxw4)
 - [sharp advisory](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c)
+- [Next.js Image Optimization RCE advisory](https://github.com/advisories/GHSA-2464-fhr4-w9xw)
+- [Next.js Server Actions DoS advisory](https://github.com/advisories/GHSA-p3m5-59mp-jv5r)
+- [sharp librsvg advisory](https://github.com/advisories/GHSA-wq5f-xc86-pv6w)
 - [js-yaml advisory](https://github.com/advisories/GHSA-2883-xcg3-v3hh)
