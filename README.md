@@ -192,7 +192,7 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/mail-guard.git
+git clone https://github.com/hskl18/mail-guard.git
 cd mail-guard/stack
 
 # Install dependencies
@@ -236,7 +236,6 @@ pnpm start
 
 - Secure device registration
 - Serial number validation
-- API key generation for IoT devices
 - Device configuration management
 
 ### **Notifications (`/notifications`)**
@@ -308,15 +307,14 @@ Operators run the offline migration CLI from a trusted shell.
 - ESP32-CAM with OV2640 camera
 - Magnetic reed switches for door detection
 - HX711 load cell amplifier for weight sensing
-- Battery monitoring with low-power modes
+- Battery voltage reading through an ADC
 
 ### **Firmware Features**
 
-- Secure HTTPS communication with API
-- Automatic device registration
+- Two ESP32 boards, for sensing and camera upload, linked over UART
+- HTTPS requests to the API with a bearer key
 - Photo capture and upload
-- Battery optimization
-- WiFi credential management
+- Delivery and removal detection from load-cell weight changes
 
 ### **Hardware Setup**
 
@@ -407,21 +405,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details on:
-
-- Code style and standards
-- Security requirements
-- Testing procedures
-- Documentation standards
-
----
-
-## 📞 Support
-
-- **Documentation**: [Wiki](https://github.com/yourusername/mail-guard/wiki)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/mail-guard/issues)
-- **Security**: security@mailguard.com
-- **General**: support@mailguard.com
+This repository is archived and does not accept contributions.
 
 ---
 

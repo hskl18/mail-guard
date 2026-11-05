@@ -27,8 +27,8 @@ const char *FIRMWARE_VERSION = "1.2.0";
 const int serverPort = 443; // HTTPS port
 
 // === WiFi CONFIGURATION ===
-const char *ssid = "冰小六";
-const char *password = "";
+const char *ssid = WIFI_SSID;
+const char *password = WIFI_PASSWORD;
 
 // Pin definition for AI-THINKER Model (and ESP32-S)
 #define PWDN_GPIO_NUM 32
